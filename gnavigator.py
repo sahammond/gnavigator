@@ -23,11 +23,11 @@ import argparse
 
 import pandas as pd
 
+
 # TODOs
-# report which cDNAs fall into which category
 # return the sequence from the assembly that corresponds to the cDNA
-## related: return cDNA:scaffold relationships
 # report if any genetic map cDNAs should be found between cDNAs that are observed
+
 
 def check_aln(aln, mode):
     """check the alignment of a gcat map sequence"""
@@ -38,7 +38,8 @@ def check_aln(aln, mode):
     qsize = float(aln.qsize)
     qstart = float(aln.qstart)
     qend = float(aln.qend)
-
+    scaf = aln.tname
+    cDNA = aln.qname
     
     seg = qend - qstart
     pid = matches / seg
@@ -47,21 +48,21 @@ def check_aln(aln, mode):
     
     if mode == 'assess':
         if pid >= 0.95 and pcov >= 0.95:
-            return 'complete'
+            return (cDNA, scaf, 'Complete')
         elif pid >= 0.95 and pcov < 0.95:
             if pcov >= 0.5:
-                return 'partial'
+                return (cDNA, scaf, 'Partial')
             else:
-                return 'poorly mapped'
+                return (cDNA, scaf, 'Poorly mapped')
         else:
-            return 'poorly mapped'
+            return (cDNA, scaf, 'Poorly mapped')
     
     elif mode == 'report':
         goodb = matches
         # want to penalize insertions b/c reflects correctness of assembly
         covb = matches + mismatches - qinserts
         
-        return (goodb, covb, seg, qsize)
+        return (goodb, covb, seg, qsize, cDNA, scaf)
 
 
 def check_frag(alns):
@@ -73,48 +74,61 @@ def check_frag(alns):
     covb = 0
     seg = 0
     qsize = 0
-    
+    cDNA = ''
+    scaf = []
+        
     for aln in alns:
         this_aln = check_aln(aln, 'report')
         goodb += this_aln[0]
         covb += this_aln[1]
         seg += this_aln[2]
+        scaf.append(this_aln[5])
+    else:
         qsize = this_aln[3]
+        cDNA = this_aln[4]
     
     pid = goodb / seg
     pcov = covb / qsize
     
+    scaf_rep = ";".join(scaf)
     if pid >= 0.95 and pcov >= 0.95:
-        return 'fragmented'
+        return (cDNA, scaf_rep, 'Fragmented')
     elif pid >= 0.95 and pcov < 0.95:
         if pcov > 0.5:
-            return 'partial' # distinguish from partials in a single piece?
+            return (cDNA, scaf_rep, 'Partial') # distinguish from partials in a single piece?
         else:
-            return 'poorly mapped'
+            return (cDNA, scaf_rep, 'Poorly mapped')
     else:
-        return 'poorly mapped'
+        return (cDNA, scaf_rep, 'Poorly mapped')
 
 
 def check_dupl(alns):
     """check if a gcat sequence should be considered duplicated or not based on its multiple alignments"""
     # more than one alignment must be considered complete in order to be duplicated
     # one or more partial, fragmented, poorly mapped will not count
-    results = []
+    cDNA = ''
+    scaf = []
+    results = {'Complete':[], 'Partial':[], 'Duplicated':[], 'Poorly mapped':[]}
     for aln in alns:
         this_aln = check_aln(aln, 'assess')
-        results.append(this_aln)
-    
-    if 'complete' in results:
-        num_complete = len([x for x in results if x == 'complete'])
-        if num_complete > 1:
-            return 'duplicated'
-        elif num_complete == 1:
-            return 'complete'
+        res = this_aln[-1]
+        results[res].append(this_aln)
+        scaf.append(this_aln[1])
     else:
-        if 'partial' in results:
-            return 'partial'
+        cDNA = this_aln[0]
+
+    scaf_rep = ";".join(scaf)
+    num_complete = len(results['Complete'])
+    if num_complete == 1:
+        best_scaf = scaf[0]
+        return (cDNA, best_scaf, 'Complete')
+    elif num_complete > 1:
+        return (cDNA, scaf_rep, 'Duplicated')
+    else:
+        if len(results['Partial']) >= 1:
+            return (cDNA, scaf_rep, 'Partial')
         else:
-            return 'poorly mapped'
+            return (cDNA, scaf_rep, 'Poorly mapped')
 
 
 def count_aligned(uniqA, duplA, tlocA):
@@ -141,9 +155,9 @@ def check_LG(query, genetic_map):
     numLG = len(thisMap.LG.unique())
     if len(thisMap) == 2:
         if numLG == 1:
-            return 'same LG, right order'
+            return 'Same LG, right order'
         else:
-            return 'different LG'
+            return 'Different LG'
     else:
         if numLG == 1:
             # comparing two lists of the same length will return True if order is the same
@@ -156,11 +170,11 @@ def check_LG(query, genetic_map):
             if mapL == fwdL:
                 return 'same LG, right order'
             elif mapL == revL:
-                return 'same LG, right order'
+                return 'Same LG, right order'
             else:
-                return 'same LG, wrong order'
+                return 'Same LG, wrong order'
         else:
-            return 'different LG'
+            return 'Different LG'
 
 
 def jira_formatter(num_pct_tuple):
@@ -169,6 +183,18 @@ def jira_formatter(num_pct_tuple):
     pct = num_pct_tuple[1]
     outbuff = str(num) + " " + "(" + str(pct) + "%)"
     return outbuff
+
+
+def table_formatter(results_tuple):
+    # results_tuple is from one of the check* functions
+    # (cDNA, scaffold, status), or (cDNA, scaffold1;scaffold2..., status)
+    nam = results_tuple[0]
+    scaf = results_tuple[1].split(";")
+    stat = results_tuple[2]
+    
+    for entry in scaf:
+        outbuff = "\t".join([nam, stat, entry])
+        yield outbuff
 
 
 # setup parser
@@ -180,7 +206,6 @@ parser.add_argument('-d', '--db_dir', help='Path to directory containing prebuil
 parser.add_argument('-n', '--db_name', help='Name of prebuilt GMAP index [optional]') # gmap db name
 parser.add_argument('-t', '--threads', help='Number of threads for GMAP alignment [1]', action='store', default='1')
 parser.add_argument('-m', '--genetic_map', help='Genetic map file as tsv with LG:cDNA pairs [optional]')
-
 
 # process args
 args = parser.parse_args()
@@ -197,8 +222,8 @@ if args.db_name:
     dbName = args.db_name
 else:
     dbName = '-'.join([prefix, 'gmap-index'])
-if args.genetic_map:
-    genetMap = args.genetic_map
+#if args.genetic_map:
+#    genetMap = args.genetic_map
 
 # get path to this script, and assume that the gmap sh scripts are there too
 gnavigator_path = re.sub('gnavigator.py', '', os.path.realpath(__file__))
@@ -250,50 +275,22 @@ tlocDat['qname'] = tlocDat['qname'].str[:-2]
 # total number of query sequences 
 TOT = 27143 #TODO derive from input
 
-### FOR DEV ###
-# read in the data and define extent
-#col_names = ['matches', 'mismatches', 'repmatches', 'ncount', 'qnuminsert', 'qbaseinsert', 'tnuminsert', 
-#             'tbaseinsert', 'strand', 'qname', 'qsize', 'qstart', 'qend', 'tname', 'tsize', 'tstart', 'tend',
-#             'blockcount', 'blocksizes', 'qstarts', 'tstarts']
-
-#uniqDat = pd.read_csv('gmap-tests/sitka-new-strategy-postLINKS-95.uniq', sep='\t', comment='#', low_memory=False, header=None, names=col_names)
-#duplDat = pd.read_csv('gmap-tests/sitka-new-strategy-postLINKS-95.mult', sep='\t', comment='#', low_memory=False, header=None, names=col_names)
-#tlocDat = pd.read_csv('gmap-tests/sitka-new-strategy-postLINKS-95.transloc', sep='\t', comment='#', low_memory=False, header=None, names=col_names)
-
-# remove the ".1" etc. added by GenBank to the query names
-#uniqDat['qname'] = uniqDat['qname'].str[:-2]
-#duplDat['qname'] = duplDat['qname'].str[:-2]
-#tlocDat['qname'] = tlocDat['qname'].str[:-2]
-
-# total number of query sequences 
-#TOT = 27143 #TODO derive from input
-###
-
 # read in genetic map, if supplied
 # format for spruce map is LG\tcM\tcDNA
-if genetMap:
-    mapDat = pd.read_csv(genetMap, sep="\t", comment='#', low_memory=False, header=None, names=['LG', 'cM', 'cDNA'])
+if args.genetic_map:
+    mapDat = pd.read_csv(args.genetic_map, sep="\t", comment='#', low_memory=False, header=None, names=['LG', 'cM', 'cDNA'])
     # limit genetic map analysis to complete (i.e. single) cDNAs to improve confidence
     map_cDNA = set(mapDat.cDNA.tolist())
     uniqDatMap = uniqDat[uniqDat.qname.isin(map_cDNA)]
     uMap = uniqDatMap[uniqDatMap.tname.duplicated(keep=False)]
 
 # setup counters
-num_complete = 0
-num_duplicated = 0
-num_partial = 0
-num_fragmented = 0
-num_poor = 0
+cDNA_res = {'Complete':[], 'Duplicated':[], 'Partial':[], 'Fragmented':[], 'Poorly mapped':[]}
 
 # apply check_complete to whole set
 for rec in uniqDat.itertuples():
     res = check_aln(rec, 'assess')
-    if res == 'complete':
-        num_complete += 1
-    elif res == 'partial':
-        num_partial += 1
-    elif res == 'poorly mapped':
-        num_poor += 1
+    cDNA_res[res[2]].append(res) # append results tuple
 
 # apply check_frag to whole set
 for qry in tlocDat.qname.unique():
@@ -303,12 +300,7 @@ for qry in tlocDat.qname.unique():
         frags.append(rec)
     
     res = check_frag(frags)
-    if res == 'fragmented':
-        num_fragmented += 1
-    elif res == 'partial':
-        num_partial += 1
-    elif res == 'poorly mapped':
-        num_poor += 1
+    cDNA_res[res[2]].append(res)
 
 # apply check_dupl to whole set
 for qry in duplDat.qname.unique():
@@ -317,17 +309,16 @@ for qry in duplDat.qname.unique():
     for rec in this_qry.itertuples():
         frags.append(rec)
     
-    res = check_dupl(frags)    
-    if res == 'complete':
-        num_complete += 1
-    elif res == 'duplicated':
-        num_duplicated += 1
-    elif res == 'partial':
-        num_partial += 1
-    elif res == 'poorly mapped':
-        num_poor += 1
+    res = check_dupl(frags)
+    cDNA_res[res[2]].append(res)
 
 # calc percentages and report results
+num_complete = len(cDNA_res['Complete'])
+num_duplicated = len(cDNA_res['Duplicated'])
+num_partial = len(cDNA_res['Partial'])
+num_fragmented = len(cDNA_res['Fragmented'])
+num_poor = len(cDNA_res['Poorly mapped'])
+
 rate_complete = float(num_complete) / float(TOT)
 rate_duplicated = float(num_duplicated) / float(TOT)
 rate_partial = float(num_partial) / float(TOT)
@@ -382,8 +373,18 @@ print "%s (%s%%) poorly mapped sequences" % (num_poor, pct_poor)
 print "%s (%s%%) missing sequences" % (num_miss, pct_miss)
 print "%s (%s%%) sequences were evaluated" % (num_counted, pct_counted)
 
+# write out cDNA:scaffold mappings
+header = "\t".join(["# cDNA ID", "Status", "Scaffold"])
+full_out = "-".join([prefix, "full-cDNA-results-table.tsv"])
+with open(full_out, "w") as outfile:
+    print >> outfile, header
+    for status, result in cDNA_res.items():
+        for res in result:
+            for t in table_formatter(res):
+                print >> outfile, t
+
 # apply check_LG to whole uniq set
-if genetMap:
+if args.genetic_map:
     num_goodLG = 0 # same LG, right order
     num_WO_LG = 0 # same LG, wrong order
     num_diffLG = 0 # different LG
@@ -391,15 +392,15 @@ if genetMap:
     for rec in uMap.tname.unique():
         thisScaf = uMap[uMap.tname.isin([rec])]
         res = check_LG(thisScaf, mapDat)
-        if res == 'same LG, right order':
+        if res == 'Same LG, right order':
             num_goodLG += 1
-        elif res == 'same LG, wrong order':
+        elif res == 'Same LG, wrong order':
             num_WO_LG += 1
-        elif res == 'different LG':
+        elif res == 'Different LG':
             num_diffLG += 1
 
 # report genetic map results
-if genetMap:
+if args.genetic_map:
     num_scaff_toCheck = len(uMap.tname.unique())
     num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG
     if num_scaff_toCheck == num_scaff_checked:
