@@ -20,6 +20,7 @@ import os
 import subprocess
 import re
 import argparse
+from itertools import groupby
 
 import pandas as pd
 
@@ -62,7 +63,7 @@ def check_aln(aln, mode):
         # want to penalize insertions b/c reflects correctness of assembly
         covb = matches + mismatches - qinserts
         
-        return (goodb, covb, seg, qsize, cDNA, scaf)
+    return (goodb, covb, seg, qsize, cDNA, scaf)
 
 
 def check_frag(alns):
@@ -197,6 +198,44 @@ def table_formatter(results_tuple):
         yield outbuff
 
 
+## fasta_iter
+#
+#   modified from code written by brentp and retrieved from https://www.biostars.org/p/710/ on May 5, 2015
+#   given a fasta file. yield tuples of header, sequence
+def fasta_iter(fasta_name):
+    # ditch the boolean (x[0]) and just keep the header or sequence since
+    # we know they alternate.
+    faiter = (x[1] for x in groupby(fasta_name, lambda line: line[0] == ">"))
+    for header in faiter:
+        # drop the ">"
+        header = header.next()[1:].strip()
+        # join all sequence lines to one.
+        seq = "".join(s.strip() for s in faiter.next())
+        yield header, seq
+
+
+def find_missing(fasta, res_dict):
+    # fasta is cDNA fasta
+    # res_dict is results dictionary like cDNA_res
+    cDNA_set = set()
+    with open(fasta, 'r') as infile:
+        for rec in fasta_iter(infile):
+            seqid = rec[0]
+            seqid_only = seqid.split(" ")[0]
+            cDNA_set.add(seqid_only)
+    tot_cDNA = len(cDNA_set)
+
+    detected = set()
+    for key, value in res_dict.items():
+        resID = set([x[0] for x in value])
+        detected = detected.union(resID)
+
+    missing = cDNA_set.difference(detected)
+    missingL = [(x, 'NA', 'Missing') for x in missing]
+    
+    return (missingL, tot_cDNA)
+
+
 # setup parser
 parser = argparse.ArgumentParser(description='Assess assembly quality and completeness using cDNA sequences')
 parser.add_argument('cDNA', help='FASTA file of cDNA sequences to align to assembly') # cDNA sequence fasta
@@ -206,6 +245,7 @@ parser.add_argument('-d', '--db_dir', help='Path to directory containing prebuil
 parser.add_argument('-n', '--db_name', help='Name of prebuilt GMAP index [optional]') # gmap db name
 parser.add_argument('-t', '--threads', help='Number of threads for GMAP alignment [1]', action='store', default='1')
 parser.add_argument('-m', '--genetic_map', help='Genetic map file as tsv with LG:cDNA pairs [optional]')
+parser.add_argument('-a', '--trim_accessions', help='Trim GenBank-style revision code from sequence IDs', action='store_true')
 
 # process args
 args = parser.parse_args()
@@ -222,8 +262,6 @@ if args.db_name:
     dbName = args.db_name
 else:
     dbName = '-'.join([prefix, 'gmap-index'])
-#if args.genetic_map:
-#    genetMap = args.genetic_map
 
 # get path to this script, and assume that the gmap sh scripts are there too
 gnavigator_path = re.sub('gnavigator.py', '', os.path.realpath(__file__))
@@ -268,17 +306,16 @@ uniqDat = pd.read_csv('.'.join([prefix, 'uniq']), sep='\t', comment='#', low_mem
 duplDat = pd.read_csv('.'.join([prefix, 'mult']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
 tlocDat = pd.read_csv('.'.join([prefix, 'transloc']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
 
-uniqDat['qname'] = uniqDat['qname'].str[:-2]
-duplDat['qname'] = duplDat['qname'].str[:-2]
-tlocDat['qname'] = tlocDat['qname'].str[:-2]
-
-# total number of query sequences 
-TOT = 27143 #TODO derive from input
+# remove the ".1" etc. added by GenBank to the query names?
+if args.trim_accessions:
+    uniqDat['qname'] = uniqDat['qname'].str[:-2]
+    duplDat['qname'] = duplDat['qname'].str[:-2]
+    tlocDat['qname'] = tlocDat['qname'].str[:-2]
 
 # read in genetic map, if supplied
 # format for spruce map is LG\tcM\tcDNA
 if args.genetic_map:
-    mapDat = pd.read_csv(args.genetic_map, sep="\t", comment='#', low_memory=False, header=None, names=['LG', 'cM', 'cDNA'])
+    mapDat = pd.read_csv(arg.genetic_map, sep="\t", comment='#', low_memory=False, header=None, names=['LG', 'cM', 'cDNA'])
     # limit genetic map analysis to complete (i.e. single) cDNAs to improve confidence
     map_cDNA = set(mapDat.cDNA.tolist())
     uniqDatMap = uniqDat[uniqDat.qname.isin(map_cDNA)]
@@ -312,33 +349,35 @@ for qry in duplDat.qname.unique():
     res = check_dupl(frags)
     cDNA_res[res[2]].append(res)
 
+# count total number of query sequences
+check_missing = find_missing(cDNA, cDNA_res)
+TOT = check_missing[1]
+cDNA_res['Missing'] = check_missing[0]
+
 # calc percentages and report results
 num_complete = len(cDNA_res['Complete'])
 num_duplicated = len(cDNA_res['Duplicated'])
 num_partial = len(cDNA_res['Partial'])
 num_fragmented = len(cDNA_res['Fragmented'])
 num_poor = len(cDNA_res['Poorly mapped'])
+num_missing = len(cDNA_res['Missing'])
 
 rate_complete = float(num_complete) / float(TOT)
 rate_duplicated = float(num_duplicated) / float(TOT)
 rate_partial = float(num_partial) / float(TOT)
 rate_fragmented = float(num_fragmented) / float(TOT)
 rate_poor = float(num_poor) / float(TOT)
+rate_missing = float(num_missing) / float(TOT)
 
 pct_complete = round(100.0 * rate_complete, 2)
 pct_duplicated = round(100.0 * rate_duplicated, 2)
 pct_partial = round(100.0 * rate_partial, 2)
 pct_fragmented = round(100 * rate_fragmented, 2)
 pct_poor = round(100 * rate_poor, 2)
-
-# count how many sequences are missing alignments
-obs = count_aligned(uniqDat, duplDat, tlocDat)
-num_miss = TOT - obs
-rate_miss = float(num_miss) / float(TOT)
-pct_miss = round(100.0 * rate_miss, 2)
+pct_missing = round(100 * rate_missing, 2)
 
 # determine if the right number of sequences have a reported result
-num_counted = sum([num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_miss])
+num_counted = sum([num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_missing])
 rate_counted = float(num_counted) / float(TOT)
 pct_counted = round(100 * rate_counted, 2)
 
@@ -346,8 +385,8 @@ pct_counted = round(100 * rate_counted, 2)
 tsvout = "-".join([prefix, "results.tsv"])
 with open(tsvout, "w") as outfile:
     header = "\t".join(["", "Complete", "Duplicated", "Fragmented", "Partial", "Poorly Mapped", "Missing", "Total cDNAs searched"])
-    nums = "\t".join([str(x) for x in ["Number", num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_miss, num_counted]])
-    pcts = "\t".join([str(x) for x in ["Percent", pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor, pct_miss, pct_counted]])
+    nums = "\t".join([str(x) for x in ["Number", num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_missing, num_counted]])
+    pcts = "\t".join([str(x) for x in ["Percent", pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor, pct_missing, pct_counted]])
 
     print >> outfile, header
     print >> outfile, nums
@@ -356,8 +395,8 @@ with open(tsvout, "w") as outfile:
 jiraout = "-".join([prefix, "results.jira"])
 with open(jiraout, "w") as outfile:
     header = "||".join(["", "Complete", "Duplicated", "Fragmented", "Partial", "Poorly Mapped", "Missing", "Total cDNAs searched", ""])
-    nums = [num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_miss, num_counted]
-    pcts = [pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor, pct_miss, pct_counted]
+    nums = [num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_missing, num_counted]
+    pcts = [pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor, pct_missing, pct_counted]
     res = "|" + "|".join([jira_formatter(x) for x in zip(nums, pcts)]) + "|"
     
     print >> outfile, header
@@ -370,7 +409,7 @@ print "%s (%s%%) duplicated sequences" % (num_duplicated, pct_duplicated)
 print "%s (%s%%) fragmented sequences" % (num_fragmented, pct_fragmented)
 print "%s (%s%%) partial sequences" % (num_partial, pct_partial)
 print "%s (%s%%) poorly mapped sequences" % (num_poor, pct_poor)
-print "%s (%s%%) missing sequences" % (num_miss, pct_miss)
+print "%s (%s%%) missing sequences" % (num_missing, pct_missing)
 print "%s (%s%%) sequences were evaluated" % (num_counted, pct_counted)
 
 # write out cDNA:scaffold mappings
