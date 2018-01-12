@@ -22,13 +22,16 @@ import re
 import argparse
 from itertools import groupby
 
-import pandas as pd
+try:
+    import pandas as pd
+except:
+    print 'ERROR: The pandas module is required, but was not found. Please install and try again.'
+    sys.exit(1)
 
 
 # TODOs
 # return the sequence from the assembly that corresponds to the cDNA
 # report if any genetic map cDNAs should be found between cDNAs that are observed
-
 
 def check_aln(aln, mode):
     """check the alignment of a gcat map sequence"""
@@ -57,7 +60,7 @@ def check_aln(aln, mode):
                 return (cDNA, scaf, 'Poorly mapped')
         else:
             return (cDNA, scaf, 'Poorly mapped')
-    
+
     elif mode == 'report':
         goodb = matches
         # want to penalize insertions b/c reflects correctness of assembly
@@ -87,10 +90,10 @@ def check_frag(alns):
     else:
         qsize = this_aln[3]
         cDNA = this_aln[4]
-    
+
     pid = goodb / seg
     pcov = covb / qsize
-    
+
     scaf_rep = ";".join(scaf)
     if pid >= 0.95 and pcov >= 0.95:
         return (cDNA, scaf_rep, 'Fragmented')
@@ -141,7 +144,7 @@ def count_aligned(uniqA, duplA, tlocA):
         aligned.add(rec)
     for rec in tlocA.qname.unique():
         aligned.add(rec)
-        
+
     return len(aligned)
 
 
@@ -169,7 +172,7 @@ def check_LG(query, genetic_map):
             revL = revA.qname.tolist()
             mapL = thisMap.cDNA.tolist()
             if mapL == fwdL:
-                return 'same LG, right order'
+                return 'Same LG, right order'
             elif mapL == revL:
                 return 'Same LG, right order'
             else:
@@ -192,7 +195,7 @@ def table_formatter(results_tuple):
     nam = results_tuple[0]
     scaf = results_tuple[1].split(";")
     stat = results_tuple[2]
-    
+
     for entry in scaf:
         outbuff = "\t".join([nam, stat, entry])
         yield outbuff
@@ -232,7 +235,7 @@ def find_missing(fasta, res_dict):
 
     missing = cDNA_set.difference(detected)
     missingL = [(x, 'NA', 'Missing') for x in missing]
-    
+
     return (missingL, tot_cDNA)
 
 
@@ -245,7 +248,6 @@ parser.add_argument('-d', '--db_dir', help='Path to directory containing prebuil
 parser.add_argument('-n', '--db_name', help='Name of prebuilt GMAP index [optional]') # gmap db name
 parser.add_argument('-t', '--threads', help='Number of threads for GMAP alignment [1]', action='store', default='1')
 parser.add_argument('-m', '--genetic_map', help='Genetic map file as tsv with LG:cDNA pairs [optional]')
-parser.add_argument('-a', '--trim_accessions', help='Trim GenBank-style revision code from sequence IDs', action='store_true')
 
 # process args
 args = parser.parse_args()
@@ -262,6 +264,11 @@ if args.db_name:
     dbName = args.db_name
 else:
     dbName = '-'.join([prefix, 'gmap-index'])
+if args.genetic_map:
+    check_gm = True
+    gmfile = args.genetic_map
+else:
+    check_gm = False
 
 # get path to this script, and assume that the gmap sh scripts are there too
 gnavigator_path = re.sub('gnavigator.py', '', os.path.realpath(__file__))
@@ -306,16 +313,10 @@ uniqDat = pd.read_csv('.'.join([prefix, 'uniq']), sep='\t', comment='#', low_mem
 duplDat = pd.read_csv('.'.join([prefix, 'mult']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
 tlocDat = pd.read_csv('.'.join([prefix, 'transloc']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
 
-# remove the ".1" etc. added by GenBank to the query names?
-if args.trim_accessions:
-    uniqDat['qname'] = uniqDat['qname'].str[:-2]
-    duplDat['qname'] = duplDat['qname'].str[:-2]
-    tlocDat['qname'] = tlocDat['qname'].str[:-2]
-
 # read in genetic map, if supplied
 # format for spruce map is LG\tcM\tcDNA
-if args.genetic_map:
-    mapDat = pd.read_csv(arg.genetic_map, sep="\t", comment='#', low_memory=False, header=None, names=['LG', 'cM', 'cDNA'])
+if check_gm:
+    mapDat = pd.read_csv(gmfile, sep="\t", comment='#', low_memory=False, header=None, names=['LG', 'cM', 'cDNA'])
     # limit genetic map analysis to complete (i.e. single) cDNAs to improve confidence
     map_cDNA = set(mapDat.cDNA.tolist())
     uniqDatMap = uniqDat[uniqDat.qname.isin(map_cDNA)]
@@ -335,7 +336,7 @@ for qry in tlocDat.qname.unique():
     frags = []
     for rec in this_qry.itertuples():
         frags.append(rec)
-    
+
     res = check_frag(frags)
     cDNA_res[res[2]].append(res)
 
@@ -345,7 +346,7 @@ for qry in duplDat.qname.unique():
     frags = []
     for rec in this_qry.itertuples():
         frags.append(rec)
-    
+
     res = check_dupl(frags)
     cDNA_res[res[2]].append(res)
 
@@ -376,7 +377,7 @@ pct_fragmented = round(100 * rate_fragmented, 2)
 pct_poor = round(100 * rate_poor, 2)
 pct_missing = round(100 * rate_missing, 2)
 
-# determine if the right number of sequences have a reported result
+# report if the right number of sequences have a result
 num_counted = sum([num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_missing])
 rate_counted = float(num_counted) / float(TOT)
 pct_counted = round(100 * rate_counted, 2)
@@ -398,7 +399,7 @@ with open(jiraout, "w") as outfile:
     nums = [num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_missing, num_counted]
     pcts = [pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor, pct_missing, pct_counted]
     res = "|" + "|".join([jira_formatter(x) for x in zip(nums, pcts)]) + "|"
-    
+
     print >> outfile, header
     print >> outfile, res
 
@@ -423,7 +424,7 @@ with open(full_out, "w") as outfile:
                 print >> outfile, t
 
 # apply check_LG to whole uniq set
-if args.genetic_map:
+if check_gm:
     num_goodLG = 0 # same LG, right order
     num_WO_LG = 0 # same LG, wrong order
     num_diffLG = 0 # different LG
@@ -439,7 +440,7 @@ if args.genetic_map:
             num_diffLG += 1
 
 # report genetic map results
-if args.genetic_map:
+if check_gm:
     num_scaff_toCheck = len(uMap.tname.unique())
     num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG
     if num_scaff_toCheck == num_scaff_checked:
@@ -457,7 +458,7 @@ if args.genetic_map:
         print 'Not all scaffolds to be checked against genetic map were successfully checked.'
         print 'Maybe something is wrong with the input data?'
         sys.exit(2)
-    
+
     # write to tsv
     tsvout = "-".join([prefix, "genetic-map-results.tsv"])
     with open(tsvout, "w") as outfile:
