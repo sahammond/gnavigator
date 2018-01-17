@@ -94,7 +94,7 @@ def check_frag(alns):
     pid = goodb / seg
     pcov = covb / qsize
 
-    scaf_rep = ";".join(scaf)
+    scaf_rep = ";".join(str(scaf))
     if pid >= 0.95 and pcov >= 0.95:
         return (cDNA, scaf_rep, 'Fragmented')
     elif pid >= 0.95 and pcov < 0.95:
@@ -121,7 +121,7 @@ def check_dupl(alns):
     else:
         cDNA = this_aln[0]
 
-    scaf_rep = ";".join(scaf)
+    scaf_rep = ";".join(str(scaf))
     num_complete = len(results['Complete'])
     if num_complete == 1:
         best_scaf = scaf[0]
@@ -193,7 +193,7 @@ def table_formatter(results_tuple):
     # results_tuple is from one of the check* functions
     # (cDNA, scaffold, status), or (cDNA, scaffold1;scaffold2..., status)
     nam = results_tuple[0]
-    scaf = results_tuple[1].split(";")
+    scaf = str(results_tuple[1]).split(";")
     stat = results_tuple[2]
 
     for entry in scaf:
