@@ -42,8 +42,8 @@ def check_aln(aln, mode):
     qsize = float(aln.qsize)
     qstart = float(aln.qstart)
     qend = float(aln.qend)
-    scaf = aln.tname
-    cDNA = aln.qname
+    scaf = str(aln.tname)
+    cDNA = str(aln.qname)
     
     seg = qend - qstart
     pid = matches / seg
@@ -94,7 +94,7 @@ def check_frag(alns):
     pid = goodb / seg
     pcov = covb / qsize
 
-    scaf_rep = ";".join(str(scaf))
+    scaf_rep = ";".join(scaf)
     if pid >= 0.95 and pcov >= 0.95:
         return (cDNA, scaf_rep, 'Fragmented')
     elif pid >= 0.95 and pcov < 0.95:
@@ -121,7 +121,7 @@ def check_dupl(alns):
     else:
         cDNA = this_aln[0]
 
-    scaf_rep = ";".join(str(scaf))
+    scaf_rep = ";".join(scaf)
     num_complete = len(results['Complete'])
     if num_complete == 1:
         best_scaf = scaf[0]
