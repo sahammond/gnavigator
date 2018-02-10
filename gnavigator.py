@@ -2,16 +2,15 @@
 
 # purpose: create a tool similar to CEGMA/BUSCO that uses genetic map information to assess 
 #    completeness and quality of an assembly and reporting a simple set of metrics
-
 # want to distinguish complete, partial, fragmented, duplicated, poorly mapped, and missing
-# complete: 90% of sequence is aligned with 95% identity
-# partial: less than 90% of sequence is aligned to a single scaffold, other 10% unaligned
-# fragmented: 90% of a sequence is aligned, but over multiple scaffolds
+# complete: 95% of sequence is aligned with 95% identity
+# partial: less than 95% of sequence is aligned to a single scaffold, other 5% unaligned
+# fragmented: 95% of a sequence is aligned, but over multiple scaffolds
 ## would need to use check_aln in 'report' mode and assess separately
 ## alignment would be reported in "*.transloc"
 # duplicated: as complete, but at multiple locations
 ## alignment would be reported in "*.mult"
-# poorly mapped: as complete, partial, or fragmented, but with less than 90% identity
+# poorly mapped: as complete, partial, or fragmented, but with less than 95% identity
 # missing: not aligned by gmap
 ## assessed separately
 
@@ -21,6 +20,7 @@ import subprocess
 import re
 import argparse
 from itertools import groupby
+from time import localtime, strftime
 
 try:
     import pandas as pd
@@ -28,14 +28,17 @@ except:
     print 'ERROR: The pandas module is required, but was not found. Please install and try again.'
     sys.exit(1)
 
-
 # TODOs
 # return the sequence from the assembly that corresponds to the cDNA
 # report if any genetic map cDNAs should be found between cDNAs that are observed
+# add some wiggle room to the same LG, wrong order category. +/- 25bp?
+# quit upon gmap error
+# detect pre-existing gmap indices as for alignments
+# option to delete indices after use
+# set default %ident for inter- vs intra-species cases
 
 def check_aln(aln, mode):
     """check the alignment of a gcat map sequence"""
-
     matches = float(aln.matches)
     mismatches = float(aln.mismatches)
     qinserts = float(aln.qbaseinsert)
@@ -60,7 +63,7 @@ def check_aln(aln, mode):
                 return (cDNA, scaf, 'Poorly mapped')
         else:
             return (cDNA, scaf, 'Poorly mapped')
-
+    
     elif mode == 'report':
         goodb = matches
         # want to penalize insertions b/c reflects correctness of assembly
@@ -90,10 +93,10 @@ def check_frag(alns):
     else:
         qsize = this_aln[3]
         cDNA = this_aln[4]
-
+    
     pid = goodb / seg
     pcov = covb / qsize
-
+    
     scaf_rep = ";".join(scaf)
     if pid >= 0.95 and pcov >= 0.95:
         return (cDNA, scaf_rep, 'Fragmented')
@@ -120,7 +123,6 @@ def check_dupl(alns):
         scaf.append(this_aln[1])
     else:
         cDNA = this_aln[0]
-
     scaf_rep = ";".join(scaf)
     num_complete = len(results['Complete'])
     if num_complete == 1:
@@ -144,7 +146,7 @@ def count_aligned(uniqA, duplA, tlocA):
         aligned.add(rec)
     for rec in tlocA.qname.unique():
         aligned.add(rec)
-
+        
     return len(aligned)
 
 
@@ -193,14 +195,12 @@ def table_formatter(results_tuple):
     # results_tuple is from one of the check* functions
     # (cDNA, scaffold, status), or (cDNA, scaffold1;scaffold2..., status)
     nam = results_tuple[0]
-    scaf = str(results_tuple[1]).split(";")
+    scaf = results_tuple[1].split(";")
     stat = results_tuple[2]
-
+    
     for entry in scaf:
         outbuff = "\t".join([nam, stat, entry])
         yield outbuff
-
-
 ## fasta_iter
 #
 #   modified from code written by brentp and retrieved from https://www.biostars.org/p/710/ on May 5, 2015
@@ -220,6 +220,8 @@ def fasta_iter(fasta_name):
 def find_missing(fasta, res_dict):
     # fasta is cDNA fasta
     # res_dict is results dictionary like cDNA_res
+    # trim_flag corresponds to -a flag, passed to fasta_iter
+    ## will trim GenBank-style revision code from sequence IDs
     cDNA_set = set()
     with open(fasta, 'r') as infile:
         for rec in fasta_iter(infile):
@@ -227,17 +229,19 @@ def find_missing(fasta, res_dict):
             seqid_only = seqid.split(" ")[0]
             cDNA_set.add(seqid_only)
     tot_cDNA = len(cDNA_set)
-
     detected = set()
     for key, value in res_dict.items():
         resID = set([x[0] for x in value])
         detected = detected.union(resID)
-
     missing = cDNA_set.difference(detected)
     missingL = [(x, 'NA', 'Missing') for x in missing]
-
+    
     return (missingL, tot_cDNA)
 
+
+def report_time():
+    rep = ' '.join(["Current time:", strftime("%Y-%m-%d %H:%M:%S", localtime())])
+    return rep
 
 # setup parser
 parser = argparse.ArgumentParser(description='Assess assembly quality and completeness using cDNA sequences')
@@ -255,7 +259,6 @@ cDNA = args.cDNA
 genome = args.genome
 prefix = args.prefix
 threads = args.threads
-
 if args.db_dir:
     dbDir = args.db_dir
 else:
@@ -283,20 +286,36 @@ if checkU and checkM and checkD:
     print ''.join([os.getcwd(), '/', prefix, ".uniq"])
     print ''.join([os.getcwd(), '/', prefix, ".mult"])
     print ''.join([os.getcwd(), '/', prefix, ".transloc"])
-
-# make gmap index if not supplied by user
+    print report_time()
 else:
-    if not args.db_dir and not args.db_name:
-        print "\n ===Building GMAP database=== "
+    # detect pre-existing index, use this check later. (ref153positions is final index file created)
+    checkI = os.path.isfile(''.join([os.getcwd(), '/', prefix, '-gmap-index-dir/',
+                                     prefix, '-gmap-index/', prefix, '-gmap-index.ref153positions']))
+    # check if user supplied an index
+    if args.db_dir and args.db_name:
+        print "\n=== Skipping GMAP index construction ==="
+        print "Gnavigator will use the user-specified index:"
+        print args.db_dir
+        print report_time()
+    # if not, check if index made already
+    elif checkI:
+        print "\n=== Skipping GMAP index construction ==="
+        print "Gnavigator found a pre-existing GMAP index:"
+        print ''.join([os.getcwd(), '/', prefix, '-gmap-index-dir'])
+        print report_time()      
+    # otherwise, make gmap index
+    else:
+        print "\n=== Building GMAP database ==="
+        print report_time()
         try:
             subprocess.call([gnavigator_path + '/build-index.sh', dbDir, dbName, genome])
         except:
             print 'Failed to build GMAP index.'
             print 'Make sure that build-index.sh is in the same directory as gnavigator.'
             sys.exit(1)
-
-# run gmap alignment
+    # run gmap alignment
     print "\n=== Performing GMAP alignments ==="
+    print report_time()
     try:
         subprocess.call([gnavigator_path + '/run-gmap.sh', dbDir, dbName, threads, prefix, cDNA])
     except:
@@ -308,7 +327,6 @@ else:
 col_names = ['matches', 'mismatches', 'repmatches', 'ncount', 'qnuminsert', 'qbaseinsert', 'tnuminsert', 
              'tbaseinsert', 'strand', 'qname', 'qsize', 'qstart', 'qend', 'tname', 'tsize', 'tstart', 'tend',
              'blockcount', 'blocksizes', 'qstarts', 'tstarts']
-
 uniqDat = pd.read_csv('.'.join([prefix, 'uniq']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
 duplDat = pd.read_csv('.'.join([prefix, 'mult']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
 tlocDat = pd.read_csv('.'.join([prefix, 'transloc']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
@@ -336,7 +354,7 @@ for qry in tlocDat.qname.unique():
     frags = []
     for rec in this_qry.itertuples():
         frags.append(rec)
-
+    
     res = check_frag(frags)
     cDNA_res[res[2]].append(res)
 
@@ -346,7 +364,7 @@ for qry in duplDat.qname.unique():
     frags = []
     for rec in this_qry.itertuples():
         frags.append(rec)
-
+    
     res = check_dupl(frags)
     cDNA_res[res[2]].append(res)
 
@@ -355,6 +373,16 @@ check_missing = find_missing(cDNA, cDNA_res)
 TOT = check_missing[1]
 cDNA_res['Missing'] = check_missing[0]
 
+# write out cDNA:scaffold mappings
+header = "\t".join(["# cDNA ID", "Status", "Scaffold"])
+full_out = "-".join([prefix, "full-cDNA-results-table.tsv"])
+with open(full_out, "w") as outfile:
+    print >> outfile, header
+    for status, result in cDNA_res.items():
+        for res in result:
+            for t in table_formatter(res):
+                print >> outfile, t
+
 # calc percentages and report results
 num_complete = len(cDNA_res['Complete'])
 num_duplicated = len(cDNA_res['Duplicated'])
@@ -362,14 +390,12 @@ num_partial = len(cDNA_res['Partial'])
 num_fragmented = len(cDNA_res['Fragmented'])
 num_poor = len(cDNA_res['Poorly mapped'])
 num_missing = len(cDNA_res['Missing'])
-
 rate_complete = float(num_complete) / float(TOT)
 rate_duplicated = float(num_duplicated) / float(TOT)
 rate_partial = float(num_partial) / float(TOT)
 rate_fragmented = float(num_fragmented) / float(TOT)
 rate_poor = float(num_poor) / float(TOT)
 rate_missing = float(num_missing) / float(TOT)
-
 pct_complete = round(100.0 * rate_complete, 2)
 pct_duplicated = round(100.0 * rate_duplicated, 2)
 pct_partial = round(100.0 * rate_partial, 2)
@@ -388,18 +414,16 @@ with open(tsvout, "w") as outfile:
     header = "\t".join(["", "Complete", "Duplicated", "Fragmented", "Partial", "Poorly Mapped", "Missing", "Total cDNAs searched"])
     nums = "\t".join([str(x) for x in ["Number", num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_missing, num_counted]])
     pcts = "\t".join([str(x) for x in ["Percent", pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor, pct_missing, pct_counted]])
-
     print >> outfile, header
     print >> outfile, nums
     print >> outfile, pcts
-
 jiraout = "-".join([prefix, "results.jira"])
 with open(jiraout, "w") as outfile:
     header = "||".join(["", "Complete", "Duplicated", "Fragmented", "Partial", "Poorly Mapped", "Missing", "Total cDNAs searched", ""])
     nums = [num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_missing, num_counted]
     pcts = [pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor, pct_missing, pct_counted]
     res = "|" + "|".join([jira_formatter(x) for x in zip(nums, pcts)]) + "|"
-
+    
     print >> outfile, header
     print >> outfile, res
 
@@ -412,23 +436,18 @@ print "%s (%s%%) partial sequences" % (num_partial, pct_partial)
 print "%s (%s%%) poorly mapped sequences" % (num_poor, pct_poor)
 print "%s (%s%%) missing sequences" % (num_missing, pct_missing)
 print "%s (%s%%) sequences were evaluated" % (num_counted, pct_counted)
-
-# write out cDNA:scaffold mappings
-header = "\t".join(["# cDNA ID", "Status", "Scaffold"])
-full_out = "-".join([prefix, "full-cDNA-results-table.tsv"])
-with open(full_out, "w") as outfile:
-    print >> outfile, header
-    for status, result in cDNA_res.items():
-        for res in result:
-            for t in table_formatter(res):
-                print >> outfile, t
+print report_time()
 
 # apply check_LG to whole uniq set
 if check_gm:
+    # check if there's anything to work with
+    if len(uniqDatMap) == 0:
+        print "ERROR: There are no cDNAs from the genetic map to evaluate."
+        print "This can happen if the cDNA sequence IDs do not match those in the genetic map."
+        sys.exit(2)
     num_goodLG = 0 # same LG, right order
     num_WO_LG = 0 # same LG, wrong order
     num_diffLG = 0 # different LG
-
     for rec in uMap.tname.unique():
         thisScaf = uMap[uMap.tname.isin([rec])]
         res = check_LG(thisScaf, mapDat)
@@ -448,42 +467,36 @@ if check_gm:
         rate_goodLG = float(num_goodLG) / float(num_scaff_checked)
         rate_WO_LG = float(num_WO_LG) / float(num_scaff_checked)
         rate_diffLG = float(num_diffLG) / float(num_scaff_checked)
-
         pct_LGscaff = round(100.0 * rate_LGscaff, 2) 
         pct_goodLG = round(100.0 * rate_goodLG, 2)
         pct_WO_LG = round(100.0 * rate_WO_LG, 2)
         pct_diffLG = round(100.0 * rate_diffLG, 2)
-
     else:
         print 'Not all scaffolds to be checked against genetic map were successfully checked.'
         print 'Maybe something is wrong with the input data?'
+        print report_time()
         sys.exit(2)
-
+    
     # write to tsv
     tsvout = "-".join([prefix, "genetic-map-results.tsv"])
     with open(tsvout, "w") as outfile:
         header = "\t".join(["", "Same LG, right order", "Same LG, wrong order", "Different LG", "Total scaffolds analyzed"])
         nums = "\t".join([str(x) for x in ["Number", num_goodLG, num_WO_LG, num_diffLG, num_scaff_checked]])
         pcts = "\t".join([str(x) for x in ["Percent", pct_goodLG, pct_WO_LG, pct_diffLG, pct_LGscaff]])
-
         print >> outfile, header
         print >> outfile, nums
         print >> outfile, pcts
-
     jiraout = "-".join([prefix, "genetic-map-results.jira"])
     with open(jiraout, "w") as outfile:
         header = "||".join(["", "Same LG, right order", "Same LG, wrong order", "Different LG", "Total scaffolds analyzed", ""])
         nums = [num_goodLG, num_WO_LG, num_diffLG, num_scaff_checked]
         pcts = [pct_goodLG, pct_WO_LG, pct_diffLG, pct_LGscaff]
         res = "|" + "|".join([jira_formatter(x) for x in zip(nums, pcts)]) + "|"
-
         print >> outfile, header
         print >> outfile, res
-
     print "\n=== GENETIC MAP GNAVIGATOR RESULTS ==="
     print "%s (%s%%) scaffolds had 2+ complete cDNAs from the genetic map aligned to them." % (num_scaff_checked, pct_LGscaff)
     print "%s (%s%%) case(s) were from the same linkage group and in the expected order." % (num_goodLG, pct_goodLG)
     print "%s (%s%%) case(s) were from the same linkage group, but NOT in the expected order." % (num_WO_LG, pct_WO_LG)
     print "%s (%s%%) case(s) were from different linkage groups." % (num_diffLG, pct_diffLG)
-
-### EOF ###
+    print report_time()
