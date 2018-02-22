@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+
 # purpose: create a tool similar to CEGMA/BUSCO that uses genetic map information to assess 
 #    completeness and quality of an assembly and reporting a simple set of metrics
 # want to distinguish complete, partial, fragmented, duplicated, poorly mapped, and missing
@@ -21,7 +22,6 @@ import re
 import argparse
 from itertools import groupby
 from time import localtime, strftime
-
 try:
     import pandas as pd
 except:
@@ -86,6 +86,11 @@ def check_frag(alns):
         
     for aln in alns:
         this_aln = check_aln(aln, 'report')
+        # check if a given alignment would otherwise qualify as complete
+        check_comp = check_aln(aln, 'assess')
+        if check_comp == 'Complete':
+            scaf = this_aln[5]
+            return (cDNA, scaf, 'Complete')
         goodb += this_aln[0]
         covb += this_aln[1]
         seg += this_aln[2]
@@ -280,15 +285,18 @@ gnavigator_path = re.sub('gnavigator.py', '', os.path.realpath(__file__))
 checkU = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".uniq"]))
 checkM = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".mult"]))
 checkD = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".transloc"]))
-if checkU and checkM and checkD:
+if checkU or checkM or checkD:
     print "\n=== Skipping GMAP alignment stage ==="
     print "Gnavigator found pre-existing GMAP alignment results. Will use the following files:"
-    print ''.join([os.getcwd(), '/', prefix, ".uniq"])
-    print ''.join([os.getcwd(), '/', prefix, ".mult"])
-    print ''.join([os.getcwd(), '/', prefix, ".transloc"])
+    if checkU:
+        print ''.join([os.getcwd(), '/', prefix, ".uniq"])
+    if checkM:
+        print ''.join([os.getcwd(), '/', prefix, ".mult"])
+    if checkD:
+        print ''.join([os.getcwd(), '/', prefix, ".transloc"])
     print report_time()
 else:
-    # detect pre-existing index, use this check later. (ref153positions is final index file created)
+    # detect pre-existing index, use this check later (ref153positions is final index file created)
     checkI = os.path.isfile(''.join([os.getcwd(), '/', prefix, '-gmap-index-dir/',
                                      prefix, '-gmap-index/', prefix, '-gmap-index.ref153positions']))
     # check if user supplied an index
@@ -323,17 +331,27 @@ else:
         print 'Make sure that run-gmap.sh is in the same directory as gnavigator.'
         sys.exit(1)
 
+# check which alignment files were produced
+checkU = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".uniq"]))
+checkM = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".mult"]))
+checkD = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".transloc"]))
+
 # read in the data and define extent
 col_names = ['matches', 'mismatches', 'repmatches', 'ncount', 'qnuminsert', 'qbaseinsert', 'tnuminsert', 
              'tbaseinsert', 'strand', 'qname', 'qsize', 'qstart', 'qend', 'tname', 'tsize', 'tstart', 'tend',
              'blockcount', 'blocksizes', 'qstarts', 'tstarts']
-uniqDat = pd.read_csv('.'.join([prefix, 'uniq']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
-duplDat = pd.read_csv('.'.join([prefix, 'mult']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
-tlocDat = pd.read_csv('.'.join([prefix, 'transloc']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
+if checkU:
+    uniqDat = pd.read_csv('.'.join([prefix, 'uniq']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
+if checkM:
+    duplDat = pd.read_csv('.'.join([prefix, 'mult']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
+if checkD:
+    tlocDat = pd.read_csv('.'.join([prefix, 'transloc']), sep='\t', comment='#', low_memory=False, header=None, names=col_names)
 
 # read in genetic map, if supplied
 # format for spruce map is LG\tcM\tcDNA
 if check_gm:
+    if not checkU:
+        print 'WARNING: There were no uniquely-aligned cDNAs detected, so the genetic map analysis will not be performed'
     mapDat = pd.read_csv(gmfile, sep="\t", comment='#', low_memory=False, header=None, names=['LG', 'cM', 'cDNA'])
     # limit genetic map analysis to complete (i.e. single) cDNAs to improve confidence
     map_cDNA = set(mapDat.cDNA.tolist())
@@ -344,29 +362,30 @@ if check_gm:
 cDNA_res = {'Complete':[], 'Duplicated':[], 'Partial':[], 'Fragmented':[], 'Poorly mapped':[]}
 
 # apply check_complete to whole set
-for rec in uniqDat.itertuples():
-    res = check_aln(rec, 'assess')
-    cDNA_res[res[2]].append(res) # append results tuple
+if checkU:
+    for rec in uniqDat.itertuples():
+        res = check_aln(rec, 'assess')
+        cDNA_res[res[2]].append(res) # append results tuple
 
 # apply check_frag to whole set
-for qry in tlocDat.qname.unique():
-    this_qry = tlocDat[tlocDat.qname == qry]
-    frags = []
-    for rec in this_qry.itertuples():
-        frags.append(rec)
-    
-    res = check_frag(frags)
-    cDNA_res[res[2]].append(res)
+if checkD:
+    for qry in tlocDat.qname.unique():
+        this_qry = tlocDat[tlocDat.qname == qry]
+        frags = []
+        for rec in this_qry.itertuples():
+            frags.append(rec)
+        res = check_frag(frags)
+        cDNA_res[res[2]].append(res)
 
 # apply check_dupl to whole set
-for qry in duplDat.qname.unique():
-    this_qry = duplDat[duplDat.qname == qry]
-    frags = []
-    for rec in this_qry.itertuples():
-        frags.append(rec)
-    
-    res = check_dupl(frags)
-    cDNA_res[res[2]].append(res)
+if checkM:
+    for qry in duplDat.qname.unique():
+        this_qry = duplDat[duplDat.qname == qry]
+        frags = []
+        for rec in this_qry.itertuples():
+            frags.append(rec)
+        res = check_dupl(frags)
+        cDNA_res[res[2]].append(res)
 
 # count total number of query sequences
 check_missing = find_missing(cDNA, cDNA_res)
