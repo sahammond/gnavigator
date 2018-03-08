@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-
 # purpose: create a tool similar to CEGMA/BUSCO that uses genetic map information to assess 
 #    completeness and quality of an assembly and reporting a simple set of metrics
 # want to distinguish complete, partial, fragmented, duplicated, poorly mapped, and missing
@@ -164,28 +163,30 @@ def check_LG(query, genetic_map):
     refs = query.qname.tolist()
     thisMap = genetic_map[genetic_map.cDNA.isin(refs)]
     numLG = len(thisMap.LG.unique())
+    scaf = query.tname.unique()[0]
+    fwdA = query.sort_values(['tstart'])
+    fwdL = fwdA.qname.tolist()
+    revA = query.sort_values(['tstart'], ascending=False)
+    revL = revA.qname.tolist()
+    mapL = thisMap.cDNA.tolist()
+    cDNA_names = ";".join(fwdL)
     if len(thisMap) == 2:
         if numLG == 1:
-            return 'Same LG, right order'
+            return (scaf, cDNA_names, 'Same LG, right order')
         else:
-            return 'Different LG'
+            return (scaf, cDNA_names, 'Different LG')
     else:
         if numLG == 1:
             # comparing two lists of the same length will return True if order is the same
             # compare both forward and reverse orders
-            fwdA = query.sort_values(['tstart'])
-            fwdL = fwdA.qname.tolist()
-            revA = query.sort_values(['tstart'], ascending=False)
-            revL = revA.qname.tolist()
-            mapL = thisMap.cDNA.tolist()
             if mapL == fwdL:
-                return 'Same LG, right order'
+                return (scaf, cDNA_names, 'Same LG, right order')
             elif mapL == revL:
-                return 'Same LG, right order'
+                return (scaf, cDNA_names, 'Same LG, right order')
             else:
-                return 'Same LG, wrong order'
+                return (scaf, cDNA_names, 'Same LG, wrong order')
         else:
-            return 'Different LG'
+            return (scaf, cDNA_names, 'Different LG')
 
 
 def jira_formatter(num_pct_tuple):
@@ -206,6 +207,19 @@ def table_formatter(results_tuple):
     for entry in scaf:
         outbuff = "\t".join([nam, stat, entry])
         yield outbuff
+
+
+def LG_table_formatter(results_tuple):
+    # results_tuple is from one of the check* functions
+    # (cDNA, scaffold, status), or (cDNA, scaffold1;scaffold2..., status)
+    nam = results_tuple[0]
+    cDNA = " ".join(results_tuple[1].split(";"))
+    stat = results_tuple[2]
+    
+    outbuff = "\t".join([nam, cDNA, stat])
+    yield outbuff
+
+
 ## fasta_iter
 #
 #   modified from code written by brentp and retrieved from https://www.biostars.org/p/710/ on May 5, 2015
@@ -447,7 +461,7 @@ with open(jiraout, "w") as outfile:
     print >> outfile, res
 
 # print to STDOUT
-print "\n=== GNAVIGATOR RESULTS ==="
+print "\n=== GNAVIGATOR cDNA RESULTS ==="
 print "%s (%s%%) complete sequences" % (num_complete, pct_complete)
 print "%s (%s%%) duplicated sequences" % (num_duplicated, pct_duplicated)
 print "%s (%s%%) fragmented sequences" % (num_fragmented, pct_fragmented)
@@ -464,22 +478,41 @@ if check_gm:
         print "ERROR: There are no cDNAs from the genetic map to evaluate."
         print "This can happen if the cDNA sequence IDs do not match those in the genetic map."
         sys.exit(2)
-    num_goodLG = 0 # same LG, right order
-    num_WO_LG = 0 # same LG, wrong order
-    num_diffLG = 0 # different LG
+    gm_res = {'goodLG':[], 'WO_LG':[], 'diffLG':[]}
+    #num_goodLG = 0 # same LG, right order
+    #num_WO_LG = 0 # same LG, wrong order
+    #num_diffLG = 0 # different LG
     for rec in uMap.tname.unique():
         thisScaf = uMap[uMap.tname.isin([rec])]
         res = check_LG(thisScaf, mapDat)
-        if res == 'Same LG, right order':
-            num_goodLG += 1
-        elif res == 'Same LG, wrong order':
-            num_WO_LG += 1
-        elif res == 'Different LG':
-            num_diffLG += 1
+        rep = res[2]
+        if rep == 'Same LG, right order':
+            gm_res['goodLG'].append(res)
+            #num_goodLG += 1
+        elif rep == 'Same LG, wrong order':
+            gm_res['WO_LG'].append(res)
+            #num_WO_LG += 1
+        elif rep == 'Different LG':
+            gm_res['diffLG'].append(res)
+            #num_diffLG += 1
 
-# report genetic map results
+# write cDNA:scaffold LG results to file
+if check_gm:
+    header = "\t".join(["# Scaffold", "cDNA IDs", "Status"])
+    full_out = "-".join([prefix, "full-genetic-map-results-table.tsv"])
+    with open(full_out, "w") as outfile:
+        print >> outfile, header
+        for status, result in gm_res.items():
+            for res in result:
+                for t in LG_table_formatter(res):
+                    print >> outfile, t
+
+# report summary of genetic map results
 if check_gm:
     num_scaff_toCheck = len(uMap.tname.unique())
+    num_goodLG = len(gm_res['goodLG'])
+    num_WO_LG = len(gm_res['WO_LG'])
+    num_diffLG = len(gm_res['diffLG'])
     num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG
     if num_scaff_toCheck == num_scaff_checked:
         rate_LGscaff = float(num_scaff_checked) / float(TOT)
@@ -513,7 +546,7 @@ if check_gm:
         res = "|" + "|".join([jira_formatter(x) for x in zip(nums, pcts)]) + "|"
         print >> outfile, header
         print >> outfile, res
-    print "\n=== GENETIC MAP GNAVIGATOR RESULTS ==="
+    print "\n=== GNAVIGATOR GENETIC MAP RESULTS ==="
     print "%s (%s%%) scaffolds had 2+ complete cDNAs from the genetic map aligned to them." % (num_scaff_checked, pct_LGscaff)
     print "%s (%s%%) case(s) were from the same linkage group and in the expected order." % (num_goodLG, pct_goodLG)
     print "%s (%s%%) case(s) were from the same linkage group, but NOT in the expected order." % (num_WO_LG, pct_WO_LG)
