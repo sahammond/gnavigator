@@ -163,7 +163,7 @@ def check_LG(query, genetic_map):
     refs = query.qname.tolist()
     thisMap = genetic_map[genetic_map.cDNA.isin(refs)]
     numLG = len(thisMap.LG.unique())
-    scaf = query.tname.unique()[0]
+    scaf = str(query.tname.unique()[0])
     fwdA = query.sort_values(['tstart'])
     fwdL = fwdA.qname.tolist()
     revA = query.sort_values(['tstart'], ascending=False)
