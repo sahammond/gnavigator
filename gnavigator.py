@@ -313,6 +313,9 @@ else:
     # detect pre-existing index, use this check later (ref153positions is final index file created)
     checkI = os.path.isfile(''.join([os.getcwd(), '/', prefix, '-gmap-index-dir/',
                                      prefix, '-gmap-index/', prefix, '-gmap-index.ref153positions']))
+    # make log file names
+    indexlog = "-".join([prefix, "gmap", "index.log"])
+    alignlog = "-".join([prefix, "gmap", "alignment.log"])
     # check if user supplied an index
     if args.db_dir and args.db_name:
         print "\n=== Skipping GMAP index construction ==="
@@ -330,20 +333,22 @@ else:
         print "\n=== Building GMAP database ==="
         print report_time()
         try:
-            subprocess.call([gnavigator_path + '/build-index.sh', dbDir, dbName, genome])
-        except:
-            print 'Failed to build GMAP index.'
-            print 'Make sure that build-index.sh is in the same directory as gnavigator.'
+            subprocess.check_call([gnavigator_path + '/build-index.sh', dbDir, dbName, genome, indexlog])
+        except subprocess.CalledProcessError:
+            print '\nERROR: Failed to build GMAP index.'
+            print 'Make sure that build-index.sh is in the same directory as gnavigator and genome file exists.'
             sys.exit(1)
+        print "Done!"
     # run gmap alignment
     print "\n=== Performing GMAP alignments ==="
     print report_time()
     try:
-        subprocess.call([gnavigator_path + '/run-gmap.sh', dbDir, dbName, threads, prefix, cDNA])
-    except:
-        print 'Failed to perform GMAP alignment.'
-        print 'Make sure that run-gmap.sh is in the same directory as gnavigator.'
+        subprocess.check_call([gnavigator_path + '/run-gmap.sh', dbDir, dbName, threads, prefix, cDNA, alignlog])
+    except subprocess.CalledProcessError:
+        print '\nERROR: Failed to perform GMAP alignment.'
+        print 'Make sure that run-gmap.sh is in the same directory as gnavigator and cDNA file exists.'
         sys.exit(1)
+    print "Done!"
 
 # check which alignment files were produced
 checkU = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".uniq"]))
