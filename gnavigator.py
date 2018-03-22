@@ -432,14 +432,22 @@ TOT = check_missing[1]
 cDNA_res['Missing'] = check_missing[0]
 
 # write out cDNA:scaffold mappings
-header = "\t".join(["# cDNA ID", "Status", "Scaffold"])
 full_out = "-".join([prefix, "full-cDNA-results-table.tsv"])
 with open(full_out, "w") as outfile:
-    print >> outfile, header
-    for status, result in cDNA_res.items():
-        for res in result:
-            for t in table_formatter(res):
-                print >> outfile, t
+    if check_gm:
+        header = "\t".join(["# cDNA ID", "Status", "Scaffold", "Linkage group"])
+        print >> outfile, header
+        for status, result in cDNA_res.items():
+            for res in result:
+                for t in table_formatter_wGM(res, mapDat):
+                    print >> outfile, t
+    else:
+        header = "\t".join(["# cDNA ID", "Status", "Scaffold"])
+        print >> outfile, header
+        for status, result in cDNA_res.items():
+            for res in result:
+                for t in table_formatter(res):
+                    print >> outfile, t
 
 # calc percentages and report results
 num_complete = len(cDNA_res['Complete'])
@@ -522,21 +530,14 @@ if check_gm:
             #num_diffLG += 1
 
 # write out cDNA:scaffold mappings
-full_out = "-".join([prefix, "full-cDNA-results-table.tsv"])
-with open(full_out, "w") as outfile:
-    if check_gm:
-        header = "\t".join(["# cDNA ID", "Status", "Scaffold", "Linkage group"])
+if check_gm:
+    header = "\t".join(["# Scaffold", "cDNA IDs", "Status", "Linkage group(s)"])
+    full_out = "-".join([prefix, "full-genetic-map-results-table.tsv"])
+    with open(full_out, "w") as outfile:
         print >> outfile, header
-        for status, result in cDNA_res.items():
+        for status, result in gm_res.items():
             for res in result:
-                for t in table_formatter_wGM(res, mapDat):
-                    print >> outfile, t
-    else:
-        header = "\t".join(["# cDNA ID", "Status", "Scaffold"])
-        print >> outfile, header
-        for status, result in cDNA_res.items():
-            for res in result:
-                for t in table_formatter(res):
+                for t in LG_table_formatter(res):
                     print >> outfile, t
 
 # report summary of genetic map results
