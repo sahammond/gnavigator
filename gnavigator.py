@@ -205,11 +205,27 @@ def table_formatter(results_tuple):
     nam = results_tuple[0]
     scaf = results_tuple[1].split(";")
     stat = results_tuple[2]
-    
+
     for entry in scaf:
         outbuff = "\t".join([nam, stat, entry])
         yield outbuff
 
+
+def table_formatter_wGM(results_tuple, genetic_map):
+    # results_tuple is from one of the check* functions
+    # (cDNA, scaffold, status), or (cDNA, scaffold1;scaffold2..., status)
+    nam = results_tuple[0]
+    scaf = results_tuple[1].split(";")
+    stat = results_tuple[2]
+    if nam in set(genetic_map.cDNA.tolist()):
+        _cdna = genetic_map[genetic_map.cDNA.isin([nam])]
+        lg = str(_cdna.LG.iloc[0])
+    else:
+        lg = "unknownLG"
+
+    for entry in scaf:
+        outbuff = "\t".join([nam, stat, entry, lg])
+        yield outbuff
 
 def LG_table_formatter(results_tuple):
     # results_tuple is from one of the check* functions
@@ -218,7 +234,7 @@ def LG_table_formatter(results_tuple):
     cDNA = " ".join(results_tuple[1].split(";"))
     stat = results_tuple[2]
     lg = results_tuple[3]
-    
+
     outbuff = "\t".join([nam, cDNA, stat, lg])
     yield outbuff
 
@@ -505,15 +521,22 @@ if check_gm:
             gm_res['diffLG'].append(res)
             #num_diffLG += 1
 
-# write cDNA:scaffold LG results to file
-if check_gm:
-    header = "\t".join(["# Scaffold", "cDNA IDs", "Status", "Linkage group(s)"])
-    full_out = "-".join([prefix, "full-genetic-map-results-table.tsv"])
-    with open(full_out, "w") as outfile:
+# write out cDNA:scaffold mappings
+full_out = "-".join([prefix, "full-cDNA-results-table.tsv"])
+with open(full_out, "w") as outfile:
+    if check_gm:
+        header = "\t".join(["# cDNA ID", "Status", "Scaffold", "Linkage group"])
         print >> outfile, header
-        for status, result in gm_res.items():
+        for status, result in cDNA_res.items():
             for res in result:
-                for t in LG_table_formatter(res):
+                for t in table_formatter_wGM(res, mapDat):
+                    print >> outfile, t
+    else:
+        header = "\t".join(["# cDNA ID", "Status", "Scaffold"])
+        print >> outfile, header
+        for status, result in cDNA_res.items():
+            for res in result:
+                for t in table_formatter(res):
                     print >> outfile, t
 
 # report summary of genetic map results
