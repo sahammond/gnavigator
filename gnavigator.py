@@ -162,7 +162,9 @@ def check_LG(query, genetic_map):
     # returns 'same LG, right order', 'same LG, wrong order', or 'different LG'
     refs = query.qname.tolist()
     thisMap = genetic_map[genetic_map.cDNA.isin(refs)]
-    numLG = len(thisMap.LG.unique())
+    theseLGlist = thisMap.LG.unique().tolist()
+    theseLG = ";".join(theseLGlist)
+    numLG = len(theseLGlist)
     scaf = str(query.tname.unique()[0])
     fwdA = query.sort_values(['tstart'])
     fwdL = fwdA.qname.tolist()
@@ -172,21 +174,21 @@ def check_LG(query, genetic_map):
     cDNA_names = ";".join(fwdL)
     if len(thisMap) == 2:
         if numLG == 1:
-            return (scaf, cDNA_names, 'Same LG, right order')
+            return (scaf, cDNA_names, 'Same LG, right order', theseLG)
         else:
-            return (scaf, cDNA_names, 'Different LG')
+            return (scaf, cDNA_names, 'Different LG', theseLG)
     else:
         if numLG == 1:
             # comparing two lists of the same length will return True if order is the same
             # compare both forward and reverse orders
             if mapL == fwdL:
-                return (scaf, cDNA_names, 'Same LG, right order')
+                return (scaf, cDNA_names, 'Same LG, right order', theseLG)
             elif mapL == revL:
-                return (scaf, cDNA_names, 'Same LG, right order')
+                return (scaf, cDNA_names, 'Same LG, right order', theseLG)
             else:
-                return (scaf, cDNA_names, 'Same LG, wrong order')
+                return (scaf, cDNA_names, 'Same LG, wrong order', theseLG)
         else:
-            return (scaf, cDNA_names, 'Different LG')
+            return (scaf, cDNA_names, 'Different LG', theseLG)
 
 
 def jira_formatter(num_pct_tuple):
@@ -215,8 +217,9 @@ def LG_table_formatter(results_tuple):
     nam = results_tuple[0]
     cDNA = " ".join(results_tuple[1].split(";"))
     stat = results_tuple[2]
+    lg = results_tuple[3]
     
-    outbuff = "\t".join([nam, cDNA, stat])
+    outbuff = "\t".join([nam, cDNA, stat, lg])
     yield outbuff
 
 
@@ -371,6 +374,7 @@ if checkD:
 if check_gm:
     if not checkU:
         print 'WARNING: There were no uniquely-aligned cDNAs detected, so the genetic map analysis will not be performed'
+        sys.exit(2)
     mapDat = pd.read_csv(gmfile, sep="\t", comment='#', low_memory=False, header=None, names=['LG', 'cM', 'cDNA'])
     # limit genetic map analysis to complete (i.e. single) cDNAs to improve confidence
     map_cDNA = set(mapDat.cDNA.tolist())
@@ -503,7 +507,7 @@ if check_gm:
 
 # write cDNA:scaffold LG results to file
 if check_gm:
-    header = "\t".join(["# Scaffold", "cDNA IDs", "Status"])
+    header = "\t".join(["# Scaffold", "cDNA IDs", "Status", "Linkage group(s)"])
     full_out = "-".join([prefix, "full-genetic-map-results-table.tsv"])
     with open(full_out, "w") as outfile:
         print >> outfile, header
