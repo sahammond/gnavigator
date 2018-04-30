@@ -32,7 +32,6 @@ except:
 # report if any genetic map cDNAs should be found between cDNAs that are observed
 # add some wiggle room to the same LG, wrong order category. +/- 25bp?
 # quit upon gmap error
-# detect pre-existing gmap indices as for alignments
 # option to delete indices after use
 # set default %ident for inter- vs intra-species cases
 
@@ -281,10 +280,16 @@ def report_time():
     rep = ' '.join(["Current time:", strftime("%Y-%m-%d %H:%M:%S", localtime())])
     return rep
 
+
+def report_cmd():
+    rep = '## Gnavigator command was: ' + ' '.join(sys.argv)
+    return rep
+
 # setup parser
 parser = argparse.ArgumentParser(description='Assess assembly quality and completeness using cDNA sequences')
 parser.add_argument('cDNA', help='FASTA file of cDNA sequences to align to assembly') # cDNA sequence fasta
 parser.add_argument('genome', help='FASTA file of genome assembly to assess')
+parser.add_argument('-r', '--transcriptome', help='Transcriptome assessment mode. See manual for details. [off]', action='store_true') # use nonspliced alignments
 parser.add_argument('-p', '--prefix', help='Prefix to use for intermediate and output files [gnavigator]', default='gnavigator') # prefix
 parser.add_argument('-d', '--db_dir', help='Path to directory containing prebuilt GMAP index [optional]') # gmap db dir
 parser.add_argument('-n', '--db_name', help='Name of prebuilt GMAP index [optional]') # gmap db name
@@ -310,6 +315,13 @@ if args.genetic_map:
     gmfile = args.genetic_map
 else:
     check_gm = False
+if args.transcriptome:
+    trans_mode = True
+
+# check mutually-exclusive conditions
+if check_gm and trans_mode:
+    print ('WARNING: You have specified a genetic map file while selecting',
+        ' transcriptome assessment mode. The genetic map will not be used.')
 
 # get path to this script, and assume that the gmap sh scripts are there too
 gnavigator_path = re.sub('gnavigator.py', '', os.path.realpath(__file__))
@@ -343,31 +355,43 @@ else:
         print report_time()
     # if not, check if index made already
     elif checkI:
-        print "\n=== Skipping GMAP index construction ==="
-        print "Gnavigator found a pre-existing GMAP index:"
+        print '\n=== Skipping GMAP index construction ==='
+        print 'Gnavigator found a pre-existing GMAP index:'
         print ''.join([os.getcwd(), '/', prefix, '-gmap-index-dir'])
         print report_time()      
     # otherwise, make gmap index
     else:
-        print "\n=== Building GMAP database ==="
+        print '\n=== Building GMAP database ==='
         print report_time()
         try:
             subprocess.check_call([gnavigator_path + '/build-index.sh', dbDir, dbName, genome, indexlog])
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
             print '\nERROR: Failed to build GMAP index.'
             print 'Make sure that build-index.sh is in the same directory as gnavigator and genome file exists.'
+            print e.output
+            sys.exit(1)
+        print 'Done!'
+    # run gmap alignment
+    print '\n=== Performing GMAP alignments ==='
+    print report_time()
+    if trans_mode:    
+        print 'Running in transcriptome assessment mode. Will run GMAP without splicing.'
+        try:
+            subprocess.check_call([gnavigator_path + '/run-gmap.sh', dbDir, dbName, threads, prefix, cDNA, alignlog, 'N'])
+        except subprocess.CalledProcessError as e:
+            print '\nERROR: Failed to perform GMAP alignment.'
+            print 'Make sure that run-gmap.sh is in the same directory as gnavigator and cDNA file exists.'
+            print e.output
+            sys.exit(1)
+    else:
+        try:
+            subprocess.check_call([gnavigator_path + '/run-gmapl.sh', dbDir, dbName, threads, prefix, cDNA, alignlog])
+        except subprocess.CalledProcessError:
+            print '\nERROR: Failed to perform GMAP alignment.'
+            print 'Make sure that run-gmap.sh is in the same directory as gnavigator and cDNA file exists.'
+            print e.output
             sys.exit(1)
         print "Done!"
-    # run gmap alignment
-    print "\n=== Performing GMAP alignments ==="
-    print report_time()
-    try:
-        subprocess.check_call([gnavigator_path + '/run-gmap.sh', dbDir, dbName, threads, prefix, cDNA, alignlog])
-    except subprocess.CalledProcessError:
-        print '\nERROR: Failed to perform GMAP alignment.'
-        print 'Make sure that run-gmap.sh is in the same directory as gnavigator and cDNA file exists.'
-        sys.exit(1)
-    print "Done!"
 
 # check which alignment files were produced
 checkU = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".uniq"]))
@@ -436,6 +460,7 @@ full_out = "-".join([prefix, "full-cDNA-results-table.tsv"])
 with open(full_out, "w") as outfile:
     if check_gm:
         header = "\t".join(["# cDNA ID", "Status", "Scaffold", "Linkage group"])
+        print >> outfile, report_cmd()
         print >> outfile, header
         for status, result in cDNA_res.items():
             for res in result:
@@ -443,6 +468,7 @@ with open(full_out, "w") as outfile:
                     print >> outfile, t
     else:
         header = "\t".join(["# cDNA ID", "Status", "Scaffold"])
+        print >> outfile, report_cmd()
         print >> outfile, header
         for status, result in cDNA_res.items():
             for res in result:
@@ -480,6 +506,7 @@ with open(tsvout, "w") as outfile:
     header = "\t".join(["", "Complete", "Duplicated", "Fragmented", "Partial", "Poorly Mapped", "Missing", "Total cDNAs searched"])
     nums = "\t".join([str(x) for x in ["Number", num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_missing, num_counted]])
     pcts = "\t".join([str(x) for x in ["Percent", pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor, pct_missing, pct_counted]])
+    print >> outfile, report_cmd()
     print >> outfile, header
     print >> outfile, nums
     print >> outfile, pcts
@@ -489,7 +516,7 @@ with open(jiraout, "w") as outfile:
     nums = [num_complete, num_duplicated, num_fragmented, num_partial, num_poor, num_missing, num_counted]
     pcts = [pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor, pct_missing, pct_counted]
     res = "|" + "|".join([jira_formatter(x) for x in zip(nums, pcts)]) + "|"
-    
+    print >> outfile, report_cmd()
     print >> outfile, header
     print >> outfile, res
 
@@ -534,6 +561,7 @@ if check_gm:
     header = "\t".join(["# Scaffold", "cDNA IDs", "Status", "Linkage group(s)"])
     full_out = "-".join([prefix, "full-genetic-map-results-table.tsv"])
     with open(full_out, "w") as outfile:
+        print >> outfile, report_cmd()
         print >> outfile, header
         for status, result in gm_res.items():
             for res in result:
@@ -568,6 +596,7 @@ if check_gm:
         header = "\t".join(["", "Same LG, right order", "Same LG, wrong order", "Different LG", "Total scaffolds analyzed"])
         nums = "\t".join([str(x) for x in ["Number", num_goodLG, num_WO_LG, num_diffLG, num_scaff_checked]])
         pcts = "\t".join([str(x) for x in ["Percent", pct_goodLG, pct_WO_LG, pct_diffLG, pct_LGscaff]])
+        print >> outfile, report_cmd()
         print >> outfile, header
         print >> outfile, nums
         print >> outfile, pcts
