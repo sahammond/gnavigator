@@ -36,7 +36,7 @@ except:
 # option to delete indices after use
 # set default %ident for inter- vs intra-species cases
 
-def check_aln(aln, mode):
+def check_aln(aln, mode, ident_thold, cov_thold):
     """check the alignment of a gcat map sequence"""
     matches = float(aln.matches)
     mismatches = float(aln.mismatches)
@@ -53,9 +53,9 @@ def check_aln(aln, mode):
     pcov = (matches + mismatches - qinserts) / qsize
     
     if mode == 'assess':
-        if pid >= 0.95 and pcov >= 0.95:
+        if pid >= ident_thold and pcov >= cov_thold:
             return (cDNA, scaf, 'Complete')
-        elif pid >= 0.95 and pcov < 0.95:
+        elif pid >= ident_thold and pcov < cov_thold:
             if pcov >= 0.5:
                 return (cDNA, scaf, 'Partial')
             else:
@@ -71,7 +71,7 @@ def check_aln(aln, mode):
     return (goodb, covb, seg, qsize, cDNA, scaf)
 
 
-def check_frag(alns):
+def check_frag(alns, ident_thold, cov_thold):
     """check if 'chimeric' alignment is good or not"""
     # take in a series of blat alignments and evaluate them together
     # TODO extend to assess non-chimeric alignments
@@ -84,9 +84,9 @@ def check_frag(alns):
     scaf = []
         
     for aln in alns:
-        this_aln = check_aln(aln, 'report')
+        this_aln = check_aln(aln, 'report', ident_thold, cov_thold)
         # check if a given alignment would otherwise qualify as complete
-        check_comp = check_aln(aln, 'assess')
+        check_comp = check_aln(aln, 'assess', ident_thold, cov_thold)
         if check_comp == 'Complete':
             scaf = this_aln[5]
             return (cDNA, scaf, 'Complete')
@@ -102,9 +102,9 @@ def check_frag(alns):
     pcov = covb / qsize
     
     scaf_rep = ";".join(scaf)
-    if pid >= 0.95 and pcov >= 0.95:
+    if pid >= ident_thold and pcov >= cov_thold:
         return (cDNA, scaf_rep, 'Fragmented')
-    elif pid >= 0.95 and pcov < 0.95:
+    elif pid >= ident_thold and pcov < cov_thold:
         if pcov > 0.5:
             return (cDNA, scaf_rep, 'Partial') # distinguish from partials in a single piece?
         else:
@@ -113,7 +113,7 @@ def check_frag(alns):
         return (cDNA, scaf_rep, 'Poorly mapped')
 
 
-def check_dupl(alns):
+def check_dupl(alns, ident_thold, cov_thold):
     """check if a gcat sequence should be considered duplicated or not based on its multiple alignments"""
     # more than one alignment must be considered complete in order to be duplicated
     # one or more partial, fragmented, poorly mapped will not count
@@ -121,7 +121,7 @@ def check_dupl(alns):
     scaf = []
     results = {'Complete':[], 'Partial':[], 'Duplicated':[], 'Poorly mapped':[]}
     for aln in alns:
-        this_aln = check_aln(aln, 'assess')
+        this_aln = check_aln(aln, 'assess', ident_thold, cov_thold)
         res = this_aln[-1]
         results[res].append(this_aln)
         scaf.append(this_aln[1])
@@ -288,8 +288,10 @@ parser.add_argument('genome', help='FASTA file of genome assembly to assess')
 parser.add_argument('-p', '--prefix', help='Prefix to use for intermediate and output files [gnavigator]', default='gnavigator') # prefix
 parser.add_argument('-d', '--db_dir', help='Path to directory containing prebuilt GMAP index [optional]') # gmap db dir
 parser.add_argument('-n', '--db_name', help='Name of prebuilt GMAP index [optional]') # gmap db name
-parser.add_argument('-t', '--threads', help='Number of threads for GMAP alignment [1]', action='store', default='1')
+parser.add_argument('-t', '--threads', help='Number of threads for GMAP alignment [1]', action='store', default=1, type=int)
 parser.add_argument('-m', '--genetic_map', help='Genetic map file as tsv with LG:cDNA pairs [optional]')
+parser.add_argument('-i', '--identity', help='Minimum identity threshold [0.95]', action='store', default=0.95, type=float)
+parser.add_argument('-c', '--coverage', help='Minimum coverage threshold [0.95]', action='store', default=0.95, type=float)
 
 # process args
 args = parser.parse_args()
@@ -310,6 +312,14 @@ if args.genetic_map:
     gmfile = args.genetic_map
 else:
     check_gm = False
+if args.identity < 1:
+    ident_thold = args.identity
+else:
+    ident_thold = float(args.identity) / 100.0
+if args.coverage < 1:
+    cov_thold = args.coverage
+else:
+    cov_thold = float(args.coverage) / 100.0
 
 # get path to this script, and assume that the gmap sh scripts are there too
 gnavigator_path = re.sub('gnavigator.py', '', os.path.realpath(__file__))
@@ -403,7 +413,7 @@ cDNA_res = {'Complete':[], 'Duplicated':[], 'Partial':[], 'Fragmented':[], 'Poor
 # apply check_complete to whole set
 if checkU:
     for rec in uniqDat.itertuples():
-        res = check_aln(rec, 'assess')
+        res = check_aln(rec, 'assess', ident_thold, cov_thold)
         cDNA_res[res[2]].append(res) # append results tuple
 
 # apply check_frag to whole set
@@ -413,7 +423,7 @@ if checkD:
         frags = []
         for rec in this_qry.itertuples():
             frags.append(rec)
-        res = check_frag(frags)
+        res = check_frag(frags, ident_thold, cov_thold)
         cDNA_res[res[2]].append(res)
 
 # apply check_dupl to whole set
@@ -423,7 +433,7 @@ if checkM:
         frags = []
         for rec in this_qry.itertuples():
             frags.append(rec)
-        res = check_dupl(frags)
+        res = check_dupl(frags, ident_thold, cov_thold)
         cDNA_res[res[2]].append(res)
 
 # count total number of query sequences
@@ -548,7 +558,7 @@ if check_gm:
     num_diffLG = len(gm_res['diffLG'])
     num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG
     if num_scaff_toCheck == num_scaff_checked:
-        rate_LGscaff = float(num_scaff_checked) / float(TOT)
+        rate_LGscaff = float(num_scaff_checked) / float(num_scaff_toCheck)
         rate_goodLG = float(num_goodLG) / float(num_scaff_checked)
         rate_WO_LG = float(num_WO_LG) / float(num_scaff_checked)
         rate_diffLG = float(num_diffLG) / float(num_scaff_checked)
