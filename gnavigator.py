@@ -19,7 +19,7 @@ import os
 import subprocess
 import re
 import argparse
-from itertools import groupby
+from itertools import groupby, permutations
 from time import localtime, strftime
 try:
     import pandas as pd
@@ -181,13 +181,51 @@ def check_LG(query, genetic_map):
         if numLG == 1:
             # comparing two lists of the same length will return True if order is the same
             # compare both forward and reverse orders
-            if mapL == fwdL:
+            if mapL == fwdL or mapL == revL:
                 return (scaf, cDNA_names, 'Same LG, right order', theseLG)
-            elif mapL == revL:
-                return (scaf, cDNA_names, 'Same LG, right order', theseLG)
+            # some GM features have the same position in cM
+            # shuffle such features and check if they could match the alignments
+            # handle cases where only one set of features being evaluated has the same cM position
+            ## I haven't seen more than that, and would be much trickier to handle if so
             else:
-                return (scaf, cDNA_names, 'Same LG, wrong order', theseLG)
+                dup_cm = thisMap[thisMap.duplicated('cM', False)]
+                num_dup = len(dup_cm.cM.unique())
+                dup_cDNAs = dup_cm.cDNA.unique().tolist()
+                perm = permutations(dup_cDNAs)
+                # if all features to be checked are at same cM, check the permuted orders
+                if len(dup_cm) == len(fwdL):
+                    for arr in perm:
+                        if arr == fwdL or arr == revL:
+                            return (scaf, cDNA_names, 'Same LG, right order', theseLG)
+                elif num_dup > 1:
+                    # this would be an unexpected case, at least at the contiguities I've seen so far
+                    return (scaf, cDNA_names, 'Same LG, order undetermined', theseLG)
+                else:
+                    ord_cDNA = thisMap.sort_values('cM').cDNA.tolist()
+                    ord_cDNA_base = [x for x in ord_cDNA if x not in dup_cDNAs]
+                    # determine position in ord_cDNA_base that the permuted same-cM cDNAs will be inserted at
+                    ins_pos = 0
+                    for res in enumerate(ord_cDNA):
+                        num = res[0]
+                        nam = res[1]
+                        if nam in dup_cDNAs:
+                            ins_pos = num
+                            break
+                    # generate the various orders of cDNAs to check
+                    permList = []
+                    for permut in perm:
+                        ord_cDNA_toCheck = ord_cDNA_base[:ins_pos] # preceding
+                        ord_cDNA_toCheck.extend(permut) # permuted
+                        ord_cDNA_toCheck.extend(ord_cDNA_base[ins_pos:]) # proceeding
+                        permList.append(ord_cDNA_toCheck)                 
+                    # check the orders
+                    for rec in permList:
+                        if mapL == rec:
+                            return (scaf, ";".join(rec), 'Same LG, right order', theseLG)
+                    else:
+                        return (scaf, cDNA_names, 'Same LG, wrong order', theseLG)
         else:
+            # i.e. more than 1 LG
             return (scaf, cDNA_names, 'Different LG', theseLG)
 
 
