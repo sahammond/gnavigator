@@ -159,7 +159,7 @@ def check_LG(query, genetic_map):
     # query is a pandas array of a single scaffold's alignments
     # genetic_map is a pandas array of LG\tcM\tcDNA
     # assume for now that cDNA is in genetic_map$cDNA
-    # returns 'same LG, right order', 'same LG, wrong order', or 'different LG'
+    # returns 'same LG, right order', 'same LG, wrong order', 'different LG', or 'order undetermined'
     refs = query.qname.tolist()
     thisMap = genetic_map[genetic_map.cDNA.isin(refs)]
     theseLGlist = thisMap.LG.unique().tolist()
@@ -198,7 +198,8 @@ def check_LG(query, genetic_map):
                         if arr == fwdL or arr == revL:
                             return (scaf, cDNA_names, 'Same LG, right order', theseLG)
                 elif num_dup > 1:
-                    # this would be an unexpected case, at least at the contiguities I've seen so far
+                    # this would be an unexpected case, at least at the contiguities I've seen so far,
+                    # corresponding to 2+ blocks of same-cM features on a single scaffold
                     return (scaf, cDNA_names, 'Same LG, order undetermined', theseLG)
                 else:
                     ord_cDNA = thisMap.sort_values('cM').cDNA.tolist()
@@ -220,12 +221,11 @@ def check_LG(query, genetic_map):
                         permList.append(ord_cDNA_toCheck)                 
                     # check the orders
                     for rec in permList:
-                        if mapL == rec:
+                        if fwdL == rec or revL == rec:
                             return (scaf, ";".join(rec), 'Same LG, right order', theseLG)
                     else:
                         return (scaf, cDNA_names, 'Same LG, wrong order', theseLG)
         else:
-            # i.e. more than 1 LG
             return (scaf, cDNA_names, 'Different LG', theseLG)
 
 
@@ -559,7 +559,7 @@ if check_gm:
         print "ERROR: There are no cDNAs from the genetic map to evaluate."
         print "This can happen if the cDNA sequence IDs do not match those in the genetic map."
         sys.exit(2)
-    gm_res = {'goodLG':[], 'WO_LG':[], 'diffLG':[]}
+    gm_res = {'goodLG':[], 'WO_LG':[], 'diffLG':[], 'undet':[]}
     #num_goodLG = 0 # same LG, right order
     #num_WO_LG = 0 # same LG, wrong order
     #num_diffLG = 0 # different LG
@@ -576,6 +576,8 @@ if check_gm:
         elif rep == 'Different LG':
             gm_res['diffLG'].append(res)
             #num_diffLG += 1
+        elif rep == 'Same LG, order undetermined':
+            gm_res['undet'].append(res)
 
 # write out cDNA:scaffold mappings
 if check_gm:
@@ -594,16 +596,19 @@ if check_gm:
     num_goodLG = len(gm_res['goodLG'])
     num_WO_LG = len(gm_res['WO_LG'])
     num_diffLG = len(gm_res['diffLG'])
-    num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG
+    num_undet = len(gm_res['undet'])
+    num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG + num_undet
     if num_scaff_toCheck == num_scaff_checked:
         rate_LGscaff = float(num_scaff_checked) / float(num_scaff_toCheck)
         rate_goodLG = float(num_goodLG) / float(num_scaff_checked)
         rate_WO_LG = float(num_WO_LG) / float(num_scaff_checked)
         rate_diffLG = float(num_diffLG) / float(num_scaff_checked)
+        rate_undet = float(num_undet) / float(num_scaff_checked)
         pct_LGscaff = round(100.0 * rate_LGscaff, 2) 
         pct_goodLG = round(100.0 * rate_goodLG, 2)
         pct_WO_LG = round(100.0 * rate_WO_LG, 2)
         pct_diffLG = round(100.0 * rate_diffLG, 2)
+        pct_undet = round(100.0 * rate_undet, 2)
     else:
         print 'Not all scaffolds to be checked against genetic map were successfully checked.'
         print 'Maybe something is wrong with the input data?'
@@ -613,17 +618,17 @@ if check_gm:
     # write to tsv
     tsvout = "-".join([prefix, "genetic-map-results.tsv"])
     with open(tsvout, "w") as outfile:
-        header = "\t".join(["", "Same LG, right order", "Same LG, wrong order", "Different LG", "Total scaffolds analyzed"])
-        nums = "\t".join([str(x) for x in ["Number", num_goodLG, num_WO_LG, num_diffLG, num_scaff_checked]])
-        pcts = "\t".join([str(x) for x in ["Percent", pct_goodLG, pct_WO_LG, pct_diffLG, pct_LGscaff]])
+        header = "\t".join(["", "Same LG, right order", "Same LG, wrong order", "Different LG", "Same LG, undetermined order", "Total scaffolds analyzed"])
+        nums = "\t".join([str(x) for x in ["Number", num_goodLG, num_WO_LG, num_diffLG, num_undet, num_scaff_checked]])
+        pcts = "\t".join([str(x) for x in ["Percent", pct_goodLG, pct_WO_LG, pct_diffLG, pct_undet, pct_LGscaff]])
         print >> outfile, header
         print >> outfile, nums
         print >> outfile, pcts
     jiraout = "-".join([prefix, "genetic-map-results.jira"])
     with open(jiraout, "w") as outfile:
-        header = "||".join(["", "Same LG, right order", "Same LG, wrong order", "Different LG", "Total scaffolds analyzed", ""])
-        nums = [num_goodLG, num_WO_LG, num_diffLG, num_scaff_checked]
-        pcts = [pct_goodLG, pct_WO_LG, pct_diffLG, pct_LGscaff]
+        header = "||".join(["", "Same LG, right order", "Same LG, wrong order", "Different LG", "Same LG, undetermined order", "Total scaffolds analyzed", ""])
+        nums = [num_goodLG, num_WO_LG, num_diffLG, num_undet, num_scaff_checked]
+        pcts = [pct_goodLG, pct_WO_LG, pct_diffLG, pct_undet, pct_LGscaff]
         res = "|" + "|".join([jira_formatter(x) for x in zip(nums, pcts)]) + "|"
         print >> outfile, header
         print >> outfile, res
@@ -632,4 +637,5 @@ if check_gm:
     print "%s (%s%%) case(s) were from the same linkage group and in the expected order." % (num_goodLG, pct_goodLG)
     print "%s (%s%%) case(s) were from the same linkage group, but NOT in the expected order." % (num_WO_LG, pct_WO_LG)
     print "%s (%s%%) case(s) were from different linkage groups." % (num_diffLG, pct_diffLG)
+    print "%s (%s%%) case(s) were from the same linkage group but their order could not be determined." % (num_undet, pct_undet)
     print report_time()
