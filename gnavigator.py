@@ -30,8 +30,6 @@ except:
 # TODOs
 # return the sequence from the assembly that corresponds to the cDNA
 # report if any genetic map cDNAs should be found between cDNAs that are observed
-# add some wiggle room to the same LG, wrong order category. +/- 25bp?
-# quit upon gmap error
 # detect pre-existing gmap indices as for alignments
 # option to delete indices after use
 # set default %ident for inter- vs intra-species cases
@@ -440,6 +438,7 @@ if check_gm:
         print 'WARNING: There were no uniquely-aligned cDNAs detected, so the genetic map analysis will not be performed'
         sys.exit(2)
     mapDat = pd.read_csv(gmfile, sep="\t", comment='#', low_memory=False, header=None, names=['LG', 'cM', 'cDNA'])
+    mapDat = mapDat.sort_values(['LG', 'cM'], ascending=True)
     # limit genetic map analysis to complete (i.e. single) cDNAs to improve confidence
     map_cDNA = set(mapDat.cDNA.tolist())
     uniqDatMap = uniqDat[uniqDat.qname.isin(map_cDNA)]
