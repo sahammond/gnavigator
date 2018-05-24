@@ -1,2 +1,4 @@
 .ipynb_checkpoints/
 *.bk
+src/*.pyc
+gmap_config.txt
