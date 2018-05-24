@@ -38,12 +38,16 @@ def main():
     genome = args.genome
     threads = args.threads
     if args.db_dir:
+        dbDflag = True
         dbDir = args.db_dir
     else:
+        dbDflag = False
         dbDir = ''.join([os.getcwd(), '/', args.prefix, '-gmap-index-dir'])
     if args.db_name:
+        dbNflag = True
         dbName = args.db_name
     else:
+        dbNflag = False
         dbName = '-'.join([args.prefix, 'gmap-index'])
     if args.genetic_map:
         check_gm = True
@@ -67,9 +71,15 @@ def main():
         uniqDat, duplDat, tlocDat = load_data(checkU, checkM, checkD, args.prefix)
     else:
         # generate the gmap config file if it doesn't exist yet
-        config.check_config()
+        if config.check_config():
+            pass # found gmap, don't panic
+        else:
+            print ''.join(['ERROR: Failed to locate gmap binaries. Please install',
+                           ' or specify path in gmap_config.txt manually.\n',
+                            'e.g. export PATH=/home/myuser/gmap/bin:$PATH'])
+            sys.exit(1)
         # run the alignments
-        run_gmap(args.prefix, dbDir, dbName, threads, cDNA, genome)
+        run_gmap(args.prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA, genome)
         # re-check what alignments we have
         checkU, checkM, checkD = preflight(args.prefix)
 
@@ -120,7 +130,7 @@ def get_args():
     parser.add_argument('-p', '--prefix', help='Prefix to use for intermediate and output files [gnavigator]', default='gnavigator') # prefix
     parser.add_argument('-d', '--db_dir', help='Path to directory containing prebuilt GMAP index [optional]') # gmap db dir
     parser.add_argument('-n', '--db_name', help='Name of prebuilt GMAP index [optional]') # gmap db name
-    parser.add_argument('-t', '--threads', help='Number of threads for GMAP alignment [1]', action='store', default=1, type=int)
+    parser.add_argument('-t', '--threads', help='Number of threads for GMAP alignment [1]', action='store', default=1, type=str)
     parser.add_argument('-m', '--genetic_map', help='Genetic map file as tsv with LG:cDNA pairs [optional]')
     parser.add_argument('-i', '--identity', help='Minimum identity threshold [0.95]', action='store', default=0.95, type=float)
     parser.add_argument('-c', '--coverage', help='Minimum coverage threshold [0.95]', action='store', default=0.95, type=float)
@@ -150,7 +160,7 @@ def preflight(prefix):
     return (checkU, checkM, checkD)
 
 
-def run_gmap(prefix, dbDir, dbName, threads, cDNA, genome):
+def run_gmap(prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA, genome):
     gnavigator_path = re.sub('gnavigator.py', '', os.path.realpath(__file__))
 
     # detect pre-existing index, use this check later (ref153positions is final index file created)
@@ -160,10 +170,10 @@ def run_gmap(prefix, dbDir, dbName, threads, cDNA, genome):
     indexlog = "-".join([prefix, "gmap", "index.log"])
     alignlog = "-".join([prefix, "gmap", "alignment.log"])
     # check if user supplied an index
-    if args.db_dir and args.db_name:
+    if dbDflag and dbNflag:
         print "\n=== Skipping GMAP index construction ==="
         print "Gnavigator will use the user-specified index:"
-        print args.db_dir
+        print dbDir
         print util.report_time()
     # if not, check if index made already
     elif checkI:
@@ -176,20 +186,21 @@ def run_gmap(prefix, dbDir, dbName, threads, cDNA, genome):
         print "\n=== Building GMAP database ==="
         print util.report_time()
         try:
-            subprocess.check_call([gnavigator_path + '/build-index.sh', dbDir, dbName, genome, indexlog])
+            #print ' '.join([gnavigator_path + 'bin/build-index.sh', dbDir, dbName, genome, indexlog])
+            subprocess.check_call([gnavigator_path + 'bin/build-index.sh', dbDir, dbName, genome, indexlog])
         except subprocess.CalledProcessError:
             print '\nERROR: Failed to build GMAP index.'
-            print 'Make sure that build-index.sh is in the same directory as gnavigator and genome file exists.'
+            print 'Make sure that the genome file exists.'
             sys.exit(1)
         print "Done!"
     # run gmap alignment
     print "\n=== Performing GMAP alignments ==="
     print util.report_time()
     try:
-        subprocess.check_call([gnavigator_path + '/run-gmap.sh', dbDir, dbName, threads, prefix, cDNA, alignlog])
+        subprocess.check_call([gnavigator_path + 'bin/run-gmap.sh', dbDir, dbName, threads, prefix, cDNA, alignlog])
     except subprocess.CalledProcessError:
         print '\nERROR: Failed to perform GMAP alignment.'
-        print 'Make sure that run-gmap.sh is in the same directory as gnavigator and cDNA file exists.'
+        print 'Make sure that the cDNA file exists.'
         sys.exit(1)
     print "Done!"
 

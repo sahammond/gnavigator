@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # use the gmap binary specified in the config file
-source gmap_config.txt
+source $(echo $(dirname "$0") | sed 's/bin//')/gmap_config.txt
 
 db=$1; shift
 dbname=$1; shift
