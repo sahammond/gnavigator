@@ -56,4 +56,4 @@ optional arguments:
 
 Other notes
 Gnavigator will use the first GMAP executable on your PATH. If you would prefer a different
-executable, you may specify it in the file "gnavigator-paths.txt" as in the example provided there.
+executable, you may specify it in "gmap_config.txt".
