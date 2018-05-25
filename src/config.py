@@ -19,7 +19,7 @@ def check_config():
     gnavigator_path = re.sub('src/config.py', '', gnavigator_path)
     conf_file = ''.join([gnavigator_path, 'gmap_config.txt'])
     if not os.path.isfile(conf_file):
-        msg = ' '.join(conf_file, ' not detected. Auto-generating')
+        msg = ' '.join([conf_file, ' not detected. Auto-generating'])
         print msg
         status = make_config()
         if status:
