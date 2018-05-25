@@ -64,9 +64,9 @@ def main():
         cov_thold = float(args.coverage) / 100.0
 
     # check what needs to be done
-    checkU, checkM, checkD = preflight(args.prefix)
+    checkU, checkM, checkD = preflight(args.prefix, 'pre')
 
-    # load the alignments
+    # load the alignments if pre-existing ones were found
     if checkU and checkM and checkD:
         uniqDat, duplDat, tlocDat = load_data(checkU, checkM, checkD, args.prefix)
     else:
@@ -83,10 +83,18 @@ def main():
         # re-check what alignments we have
         checkU, checkM, checkD = preflight(args.prefix)
 
-    # setup counters and run assessment
+    # setup results dict
     cDNA_dict = {'Complete':[], 'Duplicated':[], 'Partial':[], 'Fragmented':[],
                 'Poorly mapped':[]}
+
+    # load the fresh alignments
+    uniqDat, duplDat, tlocDat = load_data(checkU, checkM, checkD, args.prefix)
+
+    # run assessment
+    print '\n=== Evaluating alignments ==='
     cDNA_res = assess(checkU, checkM, checkD, uniqDat, tlocDat, duplDat, cDNA_dict, ident_thold, cov_thold)
+    print 'Done!'
+    print util.report_time()
 
     # count total number of query sequences
     check_missing = reporting.find_missing(cDNA, cDNA_res)
@@ -96,9 +104,9 @@ def main():
     # load genetic map data
     if check_gm:
         if not checkU:
-            print ''.join('WARNING: There were no uniquely-aligned cDNAs',
+            print ''.join(['WARNING: There were no uniquely-aligned cDNAs',
                           ' detected, so the genetic map analysis will',
-                          ' not be performed')
+                          ' not be performed'])
             sys.exit(2)
         else:
             mapDat, uMap, uniqDatMap = load_gm(gmfile, uniqDat)
@@ -108,8 +116,8 @@ def main():
         # check if there's anything to work with
         if len(uniqDatMap) == 0:
             print 'ERROR: There are no cDNAs from the genetic map to evaluate.'
-            print ''.join('This can happen if the cDNA sequence IDs do not match those',
-                  ' in the genetic map.')
+            print ''.join(['This can happen if the cDNA sequence IDs do not match those',
+                  ' in the genetic map.'])
             sys.exit(2)
         else:
             gmres = assess_gm(uMap, mapDat)
@@ -140,22 +148,25 @@ def get_args():
     return arguments
 
 
-def preflight(prefix):
+def preflight(prefix, stage='post'):
     """check which alignment files were produced"""
     checkU = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".uniq"]))
     checkM = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".mult"]))
     checkD = os.path.isfile(''.join([os.getcwd(), '/', prefix, ".transloc"]))
 
-    if checkU or checkM or checkD:
-        print "\n=== Skipping GMAP alignment stage ==="
-        print "Gnavigator found pre-existing GMAP alignment results. Will use the following files:"
-        if checkU:
-            print ''.join([os.getcwd(), '/', prefix, ".uniq"])
-        if checkM:
-            print ''.join([os.getcwd(), '/', prefix, ".mult"])
-        if checkD:
-            print ''.join([os.getcwd(), '/', prefix, ".transloc"])
-        print util.report_time()
+    if stage == 'pre':
+        if checkU or checkM or checkD:
+            print "\n=== Skipping GMAP alignment stage ==="
+            print "Gnavigator found pre-existing GMAP alignment results. Will use the following files:"
+            if checkU:
+                print ''.join([os.getcwd(), '/', prefix, ".uniq"])
+            if checkM:
+                print ''.join([os.getcwd(), '/', prefix, ".mult"])
+            if checkD:
+                print ''.join([os.getcwd(), '/', prefix, ".transloc"])
+            print util.report_time()
+    elif stage == 'post':
+        pass
 
     return (checkU, checkM, checkD)
 
