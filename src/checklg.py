@@ -48,11 +48,12 @@ def check_LG(query, genetic_map):
                 num_dup = len(dup_cm.cM.unique())
                 dup_cDNAs = dup_cm.cDNA.unique().tolist()
                 perm = permutations(dup_cDNAs)
-                # if all features are at same cM, check permutations
+
+                # if all features are at same cM, no way to know if order is correct
+                # give it the benefit of the doubt for now
+                # in future, may change to 'Same LG, order undetermined'
                 if len(dup_cm) == len(fwdL):
-                    for arr in perm:
-                        if arr == fwdL or arr == revL:
-                            return (scaf, cDNA_names, 'Same LG, right order', theseLG)
+                    return (scaf, cDNA_names, 'Same LG, right order', theseLG)
                 elif num_dup > 1:
                     # 2+ blocks of same-cM features not handled well
                     return (scaf, cDNA_names, 'Same LG, order undetermined', theseLG)
@@ -79,6 +80,7 @@ def check_LG(query, genetic_map):
                     for rec in permList:
                         if fwdL == rec or revL == rec:
                             return (scaf, ";".join(rec), 'Same LG, right order', theseLG)
+                    # if none of the permutations match, return 'wrong order'
                     else:
                         return (scaf, cDNA_names, 'Same LG, wrong order', theseLG)
         else:
