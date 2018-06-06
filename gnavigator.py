@@ -343,6 +343,9 @@ def report_cDNA(prefix, cDNA_results, TOT):
     pct_poor = round(100 * rate_poor, 2)
     pct_missing = round(100 * rate_missing, 2)
 
+    sum_complete = num_complete + num_duplicated
+    pct_sum_complete = pct_complete + pct_duplicated
+
     # report if the right number of sequences have a result
     num_counted = sum([num_complete, num_duplicated, num_fragmented,
                        num_partial, num_poor, num_missing])
@@ -351,14 +354,14 @@ def report_cDNA(prefix, cDNA_results, TOT):
 
     # write to tsv
     tsvout = '-'.join([prefix, 'results.tsv'])
+    header_txt = ['', 'Complete', 'Complete, single copy', 'Complete, multiple copies', 'Fragmented',
+                  'Partial', 'Poorly Mapped', 'Missing', 'Total cDNAs searched']
     with open(tsvout, 'w') as outfile:
-        header = '\t'.join(['', 'Complete', 'Duplicated', 'Fragmented',
-                            'Partial', 'Poorly Mapped', 'Missing',
-                            'Total cDNAs searched'])
-        nums = '\t'.join([str(x) for x in ['Number', num_complete, num_duplicated,
+        header = '\t'.join(header_txt)
+        nums = '\t'.join([str(x) for x in ['Number', sum_complete, num_complete, num_duplicated,
                                            num_fragmented, num_partial, num_poor,
                                            num_missing, num_counted]])
-        pcts = '\t'.join([str(x) for x in ['Percent', pct_complete, pct_duplicated,
+        pcts = '\t'.join([str(x) for x in ['Percent', pct_sum_complete, pct_complete, pct_duplicated,
                                            pct_fragmented, pct_partial, pct_poor,
                                            pct_missing, pct_counted]])
         print >> outfile, header
@@ -366,12 +369,11 @@ def report_cDNA(prefix, cDNA_results, TOT):
         print >> outfile, pcts
     jiraout = '-'.join([prefix, 'results.jira'])
     with open(jiraout, 'w') as outfile:
-        header = '||'.join(['', 'Complete', 'Duplicated', 'Fragmented',
-                            'Partial', 'Poorly Mapped', 'Missing',
-                            'Total cDNAs searched', ''])
-        nums = [num_complete, num_duplicated, num_fragmented, num_partial, num_poor,
+        header_txt.extend(['']) # add final empty string for jira table separator
+        header = '||'.join(header_txt)
+        nums = [sum_complete, num_complete, num_duplicated, num_fragmented, num_partial, num_poor,
                 num_missing, num_counted]
-        pcts = [pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor,
+        pcts = [pct_sum_complete, pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor,
                 pct_missing, pct_counted]
         res = '|' + '|'.join([util.jira_formatter(x) for x in zip(nums, pcts)]) + '|'
         
@@ -380,8 +382,9 @@ def report_cDNA(prefix, cDNA_results, TOT):
 
     # print to STDOUT
     print '\n=== GNAVIGATOR cDNA RESULTS ==='
-    print '%s (%s%%) complete sequences' % (num_complete, pct_complete)
-    print '%s (%s%%) duplicated sequences' % (num_duplicated, pct_duplicated)
+    print '%s (%s%%) complete sequences' % (sum_complete, pct_sum_complete)
+    print '%s (%s%%) complete, single copy sequences' % (num_complete, pct_complete)
+    print '%s (%s%%) complete, multiple copy sequences' % (num_duplicated, pct_duplicated)
     print '%s (%s%%) fragmented sequences' % (num_fragmented, pct_fragmented)
     print '%s (%s%%) partial sequences' % (num_partial, pct_partial)
     print '%s (%s%%) poorly mapped sequences' % (num_poor, pct_poor)
@@ -463,9 +466,9 @@ def report_gm(uMap, gm_results, prefix):
     # write to tsv
     tsvout = '-'.join([prefix, 'genetic-map-results.tsv'])
     with open(tsvout, 'w') as outfile:
-        header = '\t'.join(['', 'Same LG, right order', 'Same LG, wrong order',
-                            'Different LG', 'Same LG, undetermined order',
-                            'Total scaffolds analyzed'])
+        header_txt = ['', 'Same LG, expected order', 'Same LG, unexpected order',
+                      'Different LG', 'Same LG, undetermined order', 'Total scaffolds analyzed']
+        header = '\t'.join(header_txt)
         nums = '\t'.join([str(x) for x in ['Number', num_goodLG, num_WO_LG,
                                            num_diffLG, num_undet, num_scaff_checked]])
         pcts = '\t'.join([str(x) for x in ['Percent', pct_goodLG, pct_WO_LG,
@@ -475,14 +478,15 @@ def report_gm(uMap, gm_results, prefix):
         print >> outfile, pcts
     jiraout = '-'.join([prefix, 'genetic-map-results.jira'])
     with open(jiraout, 'w') as outfile:
-        header = '||'.join(['', 'Same LG, right order', 'Same LG, wrong order',
-                            'Different LG', 'Same LG, undetermined order',
-                            'Total scaffolds analyzed', ''])
+        header_txt.extend(['']) # add final empty string for jira table separator
+        header = '||'.join(header_txt)
         nums = [num_goodLG, num_WO_LG, num_diffLG, num_undet, num_scaff_checked]
         pcts = [pct_goodLG, pct_WO_LG, pct_diffLG, pct_undet, pct_LGscaff]
         res = '|' + '|'.join([util.jira_formatter(x) for x in zip(nums, pcts)]) + '|'
         print >> outfile, header
         print >> outfile, res
+
+    # print to STDOUT
     print '\n=== GNAVIGATOR GENETIC MAP RESULTS ==='
     print '%s (%s%%) scaffolds had 2+ complete cDNAs from the genetic map aligned to them.' % (num_scaff_checked, pct_LGscaff)
     print '%s (%s%%) case(s) were from the same linkage group and in the expected order.' % (num_goodLG, pct_goodLG)
