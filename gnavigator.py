@@ -16,18 +16,22 @@ import re
 import argparse
 
 # ensure gnavigator's src directory is in PYTHONPATH
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0]))) + '/gnavigator/src')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(
+                sys.argv[0]))) + '/gnavigator/src')
 
 import classify
 import checklg
 import reporting
 import utilities as util
 import config
+import alignment
 
 try:
     import pandas as pd
 except ImportError:
-    sys.exit("""ERROR: The pandas module is required, but was not found. Please install and try again.""")
+    msg = ''.join(["""ERROR: The pandas module is required, but was not found.""",
+                   """ Please install and try again."""])
+    sys.exit(msg)
 
 
 def main():
@@ -84,7 +88,8 @@ def main():
                             'e.g. export PATH=/home/myuser/gmap/bin:$PATH'])
             sys.exit(1)
         # run the alignments
-        run_gmap(args.prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA, genome, trans_mode)
+        alignment.run_gmap(args.prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA,
+                           genome, trans_mode)
         # re-check what alignments we have
         checkU, checkM, checkD = preflight(args.prefix)
 
@@ -97,7 +102,8 @@ def main():
 
     # run assessment
     print '\n=== Evaluating alignments ==='
-    cDNA_res = assess(checkU, checkM, checkD, uniqDat, tlocDat, duplDat, cDNA_dict, ident_thold, cov_thold)
+    cDNA_res = assess(checkU, checkM, checkD, uniqDat, tlocDat, duplDat, cDNA_dict,
+                      ident_thold, cov_thold)
     print 'Done!'
     print util.report_time()
 
@@ -137,17 +143,25 @@ def main():
 def get_args():
     """Get arguments from command line"""
 
-    parser = argparse.ArgumentParser(description='Assess assembly quality and completeness using cDNA sequences')
-    parser.add_argument('cDNA', help='FASTA file of cDNA sequences to align to assembly') # cDNA sequence fasta
+    parser = argparse.ArgumentParser(
+              description='Assess assembly quality & completeness using cDNA sequences')
+    parser.add_argument('cDNA', help='FASTA file of cDNA sequences to align to assembly')
     parser.add_argument('genome', help='FASTA file of genome assembly to assess')
-    parser.add_argument('-r', '--transcriptome', help='Transcriptome assessment mode. See manual for details. [off]', action='store_true') # use nonspliced alignments
-    parser.add_argument('-p', '--prefix', help='Prefix to use for intermediate and output files [gnavigator]', default='gnavigator') # prefix
-    parser.add_argument('-d', '--db_dir', help='Path to directory containing prebuilt GMAP index [optional]') # gmap db dir
-    parser.add_argument('-n', '--db_name', help='Name of prebuilt GMAP index [optional]') # gmap db name
-    parser.add_argument('-t', '--threads', help='Number of threads for GMAP alignment [1]', action='store', default='1', type=str)
-    parser.add_argument('-m', '--genetic_map', help='Genetic map file as tsv with LG:cDNA pairs [optional]')
-    parser.add_argument('-i', '--identity', help='Minimum identity threshold [0.95]', action='store', default=0.95, type=float)
-    parser.add_argument('-c', '--coverage', help='Minimum coverage threshold [0.95]', action='store', default=0.95, type=float)
+    parser.add_argument('-r', '--transcriptome', action='store_true',
+                        help='Transcriptome assessment mode. See manual for details. [off]')
+    parser.add_argument('-p', '--prefix', default='gnavigator',
+                        help='Prefix to use for intermediate and output files [gnavigator]')
+    parser.add_argument('-d', '--db_dir',
+                        help='Path to directory containing prebuilt GMAP index [optional]')
+    parser.add_argument('-n', '--db_name', help='Name of prebuilt GMAP index [optional]')
+    parser.add_argument('-t', '--threads', action='store', default='1', type=str,
+                        help='Number of threads for GMAP alignment [1]')
+    parser.add_argument('-m', '--genetic_map',
+                        help='Genetic map file as tsv with LG:cDNA pairs [optional]')
+    parser.add_argument('-i', '--identity', action='store', type=float, default=0.95,
+                        help='Minimum identity threshold [0.95]')
+    parser.add_argument('-c', '--coverage', action='store', type=float, default=0.95,
+                        help='Minimum coverage threshold [0.95]')
 
     arguments = parser.parse_args()
 
@@ -163,7 +177,8 @@ def preflight(prefix, stage='post'):
     if stage == 'pre':
         if checkU or checkM or checkD:
             print '\n=== Skipping GMAP alignment stage ==='
-            print 'Gnavigator found pre-existing GMAP alignment results. Will use the following files:'
+            print ''.join(['Gnavigator found pre-existing GMAP alignment results.',
+                           ' Will use the following files:'])
             if checkU:
                 print ''.join([os.getcwd(), '/', prefix, '.uniq'])
             if checkM:
@@ -175,79 +190,6 @@ def preflight(prefix, stage='post'):
         pass
 
     return (checkU, checkM, checkD)
-
-
-def run_gmap(prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA, genome, trans_mode):
-    gnavigator_path = re.sub('gnavigator.py', '', os.path.realpath(__file__))
-
-    # detect pre-existing index, use this check later (ref153positions is final index file created)
-    checkI = os.path.isfile(''.join([os.getcwd(), '/', prefix, '-gmap-index-dir/',
-                                     prefix, '-gmap-index/', prefix, '-gmap-index.ref153positions']))
-    # make log file names
-    indexlog = '-'.join([prefix, 'gmap', 'index.log'])
-    alignlog = '-'.join([prefix, 'gmap', 'alignment.log'])
-    # check if user supplied an index
-    if dbDflag and dbNflag:
-        print '\n=== Skipping GMAP index construction ==='
-        print 'Gnavigator will use the user-specified index:'
-        print dbDir
-        print util.report_time()
-    # if not, check if index made already
-    elif checkI:
-        print '\n=== Skipping GMAP index construction ==='
-        print 'Gnavigator found a pre-existing GMAP index:'
-        print ''.join([os.getcwd(), '/', prefix, '-gmap-index-dir'])
-        print util.report_time()      
-    # otherwise, make gmap index
-    else:
-        print '\n=== Building GMAP database ==='
-        print util.report_time()
-        try:
-            index_cmd = [gnavigator_path + 'bin/build-index.sh', dbDir, dbName, genome, indexlog]
-            subprocess.check_call(index_cmd)
-        except subprocess.CalledProcessError:
-            print '\nERROR: Failed to build GMAP index.'
-            print 'Make sure that the genome file exists.'
-            sys.exit(1)
-        print 'Done!'
-    # run gmap alignment
-    print '\n=== Performing GMAP alignments ==='
-    print util.report_time()
-    if trans_mode:    
-        print 'Running in transcriptome assessment mode. Will run GMAP without splicing.'
-        try:
-            # try running regular gmap first; will fail if genome too big
-            gmap_cmd = [gnavigator_path + 'bin/run-gmap.sh', dbDir, dbName, threads, prefix, cDNA, alignlog, 'N']
-            subprocess.check_call(gmap_cmd)
-        except subprocess.CalledProcessError:
-            try:
-                # genome was probably too big. Use gmapl
-                gmapl_cmd = [gnavigator_path + 'bin/run-gmapl.sh', dbDir, dbName, threads, prefix, cDNA, alignlog, 'N']
-                subprocess.check_call(gmapl_cmd)
-            except subprocess.CalledProcessError as e:
-                print '\nERROR: Failed to perform GMAP alignment.'
-                print 'Make sure that the cDNA file exists.'
-                print 'GMAP error text:'
-                print e.output
-                sys.exit(1)
-    else:
-        # not in transcriptome mode; run WITH splicing
-        try:
-            # try running regular gmap first; will fail if genome too big
-            gmap_cmd = [gnavigator_path + 'bin/run-gmap.sh', dbDir, dbName, threads, prefix, cDNA, alignlog]
-            subprocess.check_call(gmap_cmd)
-        except subprocess.CalledProcessError:
-            try:
-                # genome was probably too big. Use gmapl
-                gmapl_cmd = [gnavigator_path + 'bin/run-gmapl.sh', dbDir, dbName, threads, prefix, cDNA, alignlog]
-                subprocess.check_call(gmapl_cmd)
-            except subprocess.CalledProcessError as e:
-                print '\nERROR: Failed to perform GMAP alignment.'
-                print 'Make sure that the cDNA file exists.'
-                print 'GMAP error text:'
-                print e.output
-                sys.exit(1)
-    print 'Done!'
 
 
 def load_data(checkU, checkM, checkD, prefix):
@@ -272,7 +214,8 @@ def load_data(checkU, checkM, checkD, prefix):
 
     return (uniqDat, duplDat, tlocDat)
 
-def assess(checkU, checkD, checkM, uniqDat, tlocDat, duplDat, cDNA_results, ident_thold, cov_thold):
+def assess(checkU, checkD, checkM, uniqDat, tlocDat, duplDat, cDNA_results,
+           ident_thold, cov_thold):
     # apply check_complete to whole set
     if checkU:
         for rec in uniqDat.itertuples():
