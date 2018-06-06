@@ -134,6 +134,7 @@ def main():
             gmres = assess_gm(uMap, mapDat)
             reporting.output_gm(args.prefix, gmres)
             reporting.report_gm(uMap, gmres, args.prefix)
+    # if no genetic map data, write out the cDNA results
     else:
         # belatedly output the cDNA results without GM info
         reporting.output_cDNA(args.prefix, cDNA_res)
@@ -265,9 +266,9 @@ def assess_gm(uMap, mapDat):
         thisScaf = uMap[uMap.tname.isin([rec])]
         res = checklg.check_LG(thisScaf, mapDat)
         rep = res[2]
-        if rep == 'Same LG, right order':
+        if rep == 'Same LG, expected order':
             gm_res['goodLG'].append(res)
-        elif rep == 'Same LG, wrong order':
+        elif rep == 'Same LG, unexpected order':
             gm_res['WO_LG'].append(res)
         elif rep == 'Different LG':
             gm_res['diffLG'].append(res)

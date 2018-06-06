@@ -67,15 +67,15 @@ def report_cDNA(prefix, cDNA_results, TOT):
 
     # write to tsv
     tsvout = '-'.join([prefix, 'results.tsv'])
-    header_txt = ['', 'Complete', 'Complete, single copy', 'Complete, multiple copies', 'Fragmented',
-                  'Partial', 'Poorly Mapped', 'Missing', 'Total cDNAs searched']
+    header_txt = ['', 'Complete', 'Complete, single copy', 'Complete, multiple copies',
+                  'Fragmented', 'Partial', 'Poorly Mapped', 'Missing', 'Total cDNAs searched']
     with open(tsvout, 'w') as outfile:
         header = '\t'.join(header_txt)
         nums = '\t'.join([str(x) for x in ['Number', sum_complete, num_complete, num_duplicated,
                                            num_fragmented, num_partial, num_poor,
                                            num_missing, num_counted]])
-        pcts = '\t'.join([str(x) for x in ['Percent', pct_sum_complete, pct_complete, pct_duplicated,
-                                           pct_fragmented, pct_partial, pct_poor,
+        pcts = '\t'.join([str(x) for x in ['Percent', pct_sum_complete, pct_complete,
+                                           pct_duplicated, pct_fragmented, pct_partial, pct_poor,
                                            pct_missing, pct_counted]])
         print >> outfile, header
         print >> outfile, nums
@@ -86,8 +86,8 @@ def report_cDNA(prefix, cDNA_results, TOT):
         header = '||'.join(header_txt)
         nums = [sum_complete, num_complete, num_duplicated, num_fragmented, num_partial, num_poor,
                 num_missing, num_counted]
-        pcts = [pct_sum_complete, pct_complete, pct_duplicated, pct_fragmented, pct_partial, pct_poor,
-                pct_missing, pct_counted]
+        pcts = [pct_sum_complete, pct_complete, pct_duplicated, pct_fragmented, pct_partial,
+                pct_poor, pct_missing, pct_counted]
         res = '|' + '|'.join([util.jira_formatter(x) for x in zip(nums, pcts)]) + '|'
         
         print >> outfile, header
@@ -96,8 +96,8 @@ def report_cDNA(prefix, cDNA_results, TOT):
     # print to STDOUT
     print '\n=== GNAVIGATOR cDNA RESULTS ==='
     print '%s (%s%%) complete sequences' % (sum_complete, pct_sum_complete)
-    print '%s (%s%%) complete, single copy sequences' % (num_complete, pct_complete)
-    print '%s (%s%%) complete, multiple copy sequences' % (num_duplicated, pct_duplicated)
+    print '  %s (%s%%) complete, single copy sequences' % (num_complete, pct_complete)
+    print '  %s (%s%%) complete, multiple copy sequences' % (num_duplicated, pct_duplicated)
     print '%s (%s%%) fragmented sequences' % (num_fragmented, pct_fragmented)
     print '%s (%s%%) partial sequences' % (num_partial, pct_partial)
     print '%s (%s%%) poorly mapped sequences' % (num_poor, pct_poor)

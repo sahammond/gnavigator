@@ -14,7 +14,7 @@ def check_LG(query, genetic_map):
     # query is a pandas array of a single scaffold's alignments
     # genetic_map is a pandas array of LG\tcM\tcDNA
     # assume for now that cDNA is in genetic_map$cDNA
-    # returns 'same LG, right order', 'same LG, wrong order',
+    # returns 'same LG, expected order', 'same LG, unexpected order',
     ## 'different LG', or 'order undetermined'
     refs = query.qname.tolist()
     thisMap = genetic_map[genetic_map.cDNA.isin(refs)]
@@ -31,14 +31,14 @@ def check_LG(query, genetic_map):
 
     if len(thisMap) == 2:
         if numLG == 1:
-            return (scaf, cDNA_names, 'Same LG, right order', theseLG)
+            return (scaf, cDNA_names, 'Same LG, expected order', theseLG)
         else:
             return (scaf, cDNA_names, 'Different LG', theseLG)
     else:
         if numLG == 1:
             # compare both forward and reverse orders
             if mapL == fwdL or mapL == revL:
-                return (scaf, cDNA_names, 'Same LG, right order', theseLG)
+                return (scaf, cDNA_names, 'Same LG, expected order', theseLG)
             # some GM features have the same position in cM
             # shuffle such features and check each permutation
             # currently only handles one block of same-cM features
@@ -53,7 +53,7 @@ def check_LG(query, genetic_map):
                 # give it the benefit of the doubt for now
                 # in future, may change to 'Same LG, order undetermined'
                 if len(dup_cm) == len(fwdL):
-                    return (scaf, cDNA_names, 'Same LG, right order', theseLG)
+                    return (scaf, cDNA_names, 'Same LG, expected order', theseLG)
                 elif num_dup > 1:
                     # 2+ blocks of same-cM features not handled well
                     return (scaf, cDNA_names, 'Same LG, order undetermined', theseLG)
@@ -79,9 +79,9 @@ def check_LG(query, genetic_map):
                     # check the orders
                     for rec in permList:
                         if fwdL == rec or revL == rec:
-                            return (scaf, ";".join(rec), 'Same LG, right order', theseLG)
-                    # if none of the permutations match, return 'wrong order'
+                            return (scaf, ";".join(rec), 'Same LG, expected order', theseLG)
+                    # if none of the permutations match, return 'unexpected order'
                     else:
-                        return (scaf, cDNA_names, 'Same LG, wrong order', theseLG)
+                        return (scaf, cDNA_names, 'Same LG, unexpected order', theseLG)
         else:
             return (scaf, cDNA_names, 'Different LG', theseLG)
