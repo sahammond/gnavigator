@@ -12,7 +12,7 @@ logfile=$1; shift
 splice=$1 # set to N by main script if doing cDNA:transcript alignments; blank otherwise
 
 if [ -z "${splice}" ]; then
-    gmap -D $db -d $dbname \
+    gmapl -D $db -d $dbname \
         --max-intronlength-ends=1000000 \
         --max-intronlength-middle=1000000 \
         --totallength=20000000 \
@@ -24,7 +24,7 @@ if [ -z "${splice}" ]; then
         -n 10 \
         $infile > $logfile 2>&1
 else
-    gmap -D $db -d $dbname \
+    gmapl -D $db -d $dbname \
         --max-intronlength-ends=1000000 \
         --max-intronlength-middle=1000000 \
         --totallength=20000000 \

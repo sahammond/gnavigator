@@ -9,7 +9,7 @@ These functions classify the alignments.
 
 
 def check_aln(aln, mode, ident_thold, cov_thold):
-    """check the alignment of a gcat map sequence"""
+    """check the alignment of a cDNA sequence"""
     matches = float(aln.matches)
     mismatches = float(aln.mismatches)
     qinserts = float(aln.qbaseinsert)
