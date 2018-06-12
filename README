@@ -29,10 +29,11 @@ Same LG, wrong order: all Complete cDNAs are from the same linkage group but the
 Different LG: the Complete cDNAs that aligned to this scaffold are from different linkage groups.
     This may indicate a misassembly or a lineage-specific genomic rearrangement, depending on context.
 
-Usage:
-gnavigator.py [-h] [-p PREFIX] [-d DB_DIR] [-n DB_NAME] [-t THREADS] [-m GENETIC_MAP] cDNA genome
+usage: gnavigator.py [-h] [-r] [-p PREFIX] [-d DB_DIR] [-n DB_NAME]
+                     [-t THREADS] [-m GENETIC_MAP] [-i IDENTITY] [-c COVERAGE]
+                     cDNA genome
 
-Assess assembly quality and completeness using cDNA sequences
+Assess assembly quality & completeness using cDNA sequences
 
 positional arguments:
   cDNA                  FASTA file of cDNA sequences to align to assembly
@@ -40,6 +41,8 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  -r, --transcriptome   Transcriptome assessment mode. See manual for details.
+                        [off]
   -p PREFIX, --prefix PREFIX
                         Prefix to use for intermediate and output files
                         [gnavigator]
@@ -51,8 +54,11 @@ optional arguments:
   -t THREADS, --threads THREADS
                         Number of threads for GMAP alignment [1]
   -m GENETIC_MAP, --genetic_map GENETIC_MAP
-
                         Genetic map file as tsv with LG:cDNA pairs [optional]
+  -i IDENTITY, --identity IDENTITY
+                        Minimum identity threshold [0.95]
+  -c COVERAGE, --coverage COVERAGE
+                        Minimum coverage threshold [0.95]
 
 Other notes
 Gnavigator will use the first GMAP executable on your PATH. If you would prefer a different

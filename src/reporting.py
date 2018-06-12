@@ -139,20 +139,24 @@ def output_gm(prefix, gm_res):
                     print >> outfile, t
 
 
-def report_gm(uMap, gm_results, prefix):
+def report_gm(uMap, gm_results, gm_cdna_statuses, prefix):
     """report summary of genetic map results"""
     num_scaff_toCheck = len(uMap.tname.unique())
+    num_solo = gm_cdna_statuses['Solo']
+    tot = num_scaff_toCheck + gm_cdna_statuses['Solo']
     num_goodLG = len(gm_results['goodLG'])
     num_WO_LG = len(gm_results['WO_LG'])
     num_diffLG = len(gm_results['diffLG'])
     num_undet = len(gm_results['undet'])
     num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG + num_undet
     if num_scaff_toCheck == num_scaff_checked:
-        rate_LGscaff = float(num_scaff_checked) / float(num_scaff_toCheck)
-        rate_goodLG = float(num_goodLG) / float(num_scaff_checked)
-        rate_WO_LG = float(num_WO_LG) / float(num_scaff_checked)
-        rate_diffLG = float(num_diffLG) / float(num_scaff_checked)
-        rate_undet = float(num_undet) / float(num_scaff_checked)
+        rate_solo = float(num_solo) / float(tot)
+        rate_LGscaff = float(num_scaff_checked) / float(tot)
+        rate_goodLG = float(num_goodLG) / float(tot)
+        rate_WO_LG = float(num_WO_LG) / float(tot)
+        rate_diffLG = float(num_diffLG) / float(tot)
+        rate_undet = float(num_undet) / float(tot)
+        pct_solo = round(100.0 * rate_solo, 2)
         pct_LGscaff = round(100.0 * rate_LGscaff, 2) 
         pct_goodLG = round(100.0 * rate_goodLG, 2)
         pct_WO_LG = round(100.0 * rate_WO_LG, 2)
@@ -166,33 +170,126 @@ def report_gm(uMap, gm_results, prefix):
         sys.exit(2)
     
     # write to tsv
-    tsvout = '-'.join([prefix, 'genetic-map-results.tsv'])
+    tsvout = '-'.join([prefix, 'genetic-map-scaffold-results.tsv'])
     with open(tsvout, 'w') as outfile:
-        header_txt = ['', 'Same LG, expected order', 'Same LG, unexpected order',
-                      'Different LG', 'Same LG, undetermined order', 'Total scaffolds analyzed']
+        header_txt = ['', '1 complete cDNA', '2+ complete cDNAs', 'Same LG, expected order',
+                      'Same LG, unexpected order','Different LG', 'Same LG, undetermined order']
         header = '\t'.join(header_txt)
-        nums = '\t'.join([str(x) for x in ['Number', num_goodLG, num_WO_LG,
-                                           num_diffLG, num_undet, num_scaff_checked]])
-        pcts = '\t'.join([str(x) for x in ['Percent', pct_goodLG, pct_WO_LG,
-                                           pct_diffLG, pct_undet, pct_LGscaff]])
+        nums = '\t'.join([str(x) for x in ['Number', num_solo, num_scaff_toCheck, num_goodLG,
+                                           num_WO_LG, num_diffLG, num_undet]])
+        pcts = '\t'.join([str(x) for x in ['Percent', pct_solo, pct_LGscaff, pct_goodLG,
+                                           pct_WO_LG, pct_diffLG, pct_undet]])
         print >> outfile, header
         print >> outfile, nums
         print >> outfile, pcts
-    jiraout = '-'.join([prefix, 'genetic-map-results.jira'])
+    jiraout = '-'.join([prefix, 'genetic-map-scaffold-results.jira'])
     with open(jiraout, 'w') as outfile:
         header_txt.extend(['']) # add final empty string for jira table separator
         header = '||'.join(header_txt)
-        nums = [num_goodLG, num_WO_LG, num_diffLG, num_undet, num_scaff_checked]
-        pcts = [pct_goodLG, pct_WO_LG, pct_diffLG, pct_undet, pct_LGscaff]
+        nums = [num_solo, num_scaff_toCheck, num_goodLG, num_WO_LG, num_diffLG, num_undet]
+        pcts = [pct_solo, pct_LGscaff, pct_goodLG, pct_WO_LG, pct_diffLG, pct_undet]
         res = '|' + '|'.join([util.jira_formatter(x) for x in zip(nums, pcts)]) + '|'
         print >> outfile, header
         print >> outfile, res
 
     # print to STDOUT
-    print '\n=== GNAVIGATOR GENETIC MAP RESULTS ==='
-    print '%s (%s%%) scaffolds had 2+ complete cDNAs from the genetic map aligned to them.' % (num_scaff_checked, pct_LGscaff)
-    print '%s (%s%%) case(s) were from the same linkage group and in the expected order.' % (num_goodLG, pct_goodLG)
-    print '%s (%s%%) case(s) were from the same linkage group, but NOT in the expected order.' % (num_WO_LG, pct_WO_LG)
-    print '%s (%s%%) case(s) were from different linkage groups.' % (num_diffLG, pct_diffLG)
-    print '%s (%s%%) case(s) were from the same linkage group but their order could not be determined.' % (num_undet, pct_undet)
+    print '\n=== GNAVIGATOR GENETIC MAP RESULTS per SCAFFOLD with 1+ COMPLETE cDNA ==='
+    print ' '.join(['%s (%s%%) had exactly 1 complete cDNA from the genetic map',
+                    'aligned to them.']) % (num_solo, pct_solo)
+    print ' '.join(['%s (%s%%) had 2+ complete cDNAs from the genetic map',
+                    'aligned to them.']) % (num_scaff_checked, pct_LGscaff)
+    print ' '.join(['%s (%s%%) were from the same linkage group and in the',
+                    'expected order.']) % (num_goodLG, pct_goodLG)
+    print ' '.join(['%s (%s%%) were from the same linkage group, but NOT in',
+                    'the expected order.']) % (num_WO_LG, pct_WO_LG)
+    print '%s (%s%%) were from different linkage groups.' % (num_diffLG, pct_diffLG)
+    print ' '.join(['%s (%s%%) were from the same linkage group but their order',
+                    'could not be determined.']) % (num_undet, pct_undet)
     print util.report_time()
+
+
+def report_gm_cDNA(gm_results, cDNA_results, prefix):
+    """Report genetic map results as a proportion of eligible cDNAs"""
+
+    # input cDNA_results is dict with keys == cDNA status
+    # see src.classify.check_aln
+    gm_cdna_res = {}
+    statuses = {'Solo':0, 'Same LG, expected order':0, 'Same LG, unexpected order':0,
+                'Different LG':0, 'Same LG, order undetermined':0}
+    tot = 0
+
+    for res in gm_results.items():
+        for pres in res[1]:
+            scaf, cdnaS, stat, lg = pres
+            cdnaL = cdnaS.split(';')
+            for cdna in cdnaL:
+                gm_cdna_res[cdna] = [scaf, stat]
+                statuses[stat] += 1
+                tot += 1
+
+    miss = 'Solo'
+    for rec in cDNA_results['Complete']:
+        cdna = rec[0]
+        scaf = rec[1]
+
+        if cdna not in gm_cdna_res:
+            gm_cdna_res[cdna] = [scaf, miss]
+            statuses[miss] += 1
+            tot += 1
+
+    num_solo = statuses['Solo']
+    num_good = statuses['Same LG, expected order']
+    num_wo = statuses['Same LG, unexpected order']
+    num_diff = statuses['Different LG']
+    num_undet = statuses['Same LG, order undetermined']
+
+    rate_solo = float(statuses['Solo']) / float(tot)
+    rate_good = float(statuses['Same LG, expected order']) / float(tot)
+    rate_wo = float(statuses['Same LG, unexpected order']) / float(tot)
+    rate_diff = float(statuses['Different LG']) / float(tot)
+    rate_undet = float(statuses['Same LG, order undetermined']) / float(tot)
+
+    pct_solo = round(100.0 * rate_solo, 2)
+    pct_good = round(100.0 * rate_good, 2)
+    pct_wo = round(100.0 * rate_wo, 2)
+    pct_diff = round(100.0 * rate_diff, 2)
+    pct_undet = round(100.0 * rate_undet, 2)
+
+    # write to tsv
+    tsvout = '-'.join([prefix, 'genetic-map-cDNA-results.tsv'])
+    with open(tsvout, 'w') as outfile:
+        header_txt = ['', 'Solo (unevaluated)', 'Same LG, expected order',
+                      'Same LG, unexpected order', 'Different LG', 'Same LG, order undetermined']
+        header = '\t'.join(header_txt)
+        nums = '\t'.join([str(x) for x in ['Number', num_solo, num_good, num_wo, num_diff,
+                                           num_undet]])
+        pcts = '\t'.join([str(x) for x in ['Percent', pct_solo, pct_good, pct_wo, pct_diff,
+                                           pct_undet]])
+        print >> outfile, header
+        print >> outfile, nums
+        print >> outfile, pcts
+    jiraout = '-'.join([prefix, 'genetic-map-cDNA-results.jira'])
+    with open(jiraout, 'w') as outfile:
+        header_txt.extend(['']) # add final empty string for jira table separator
+        header = '||'.join(header_txt)
+        nums = [num_solo, num_good, num_wo, num_diff, num_undet]
+        pcts = [pct_solo, pct_good, pct_wo, pct_diff, pct_undet]
+        res = '|' + '|'.join([util.jira_formatter(x) for x in zip(nums, pcts)]) + '|'
+        print >> outfile, header
+        print >> outfile, res
+
+    print '\n=== GNAVIGATOR GENETIC MAP RESULTS per COMPLETE cDNA ==='
+    print ' '.join(['%s (%s%%) were found alone on a scaffold and were not evaluated',
+                    'further.']) % (num_solo, pct_solo)
+    print ' '.join(['%s (%s%%) were from the same linkage group and were found on scaffolds in',
+                    'the expected order']) % (num_good, pct_good)
+    print ' '.join(['%s (%s%%) were from the same linkage group but were found on scaffolds in an',
+                    'unexpected order.']) % (num_wo, pct_wo)
+    print ' '.join(['%s (%s%%) were from different linkage groups but were found on the same',
+                    'scaffold.']) % (num_diff, pct_diff)
+    print ' '.join(['%s (%s%%) were from the same linkage group but their order could not be',
+                    'determined.']) % (num_undet, pct_undet)
+    print util.report_time()
+
+    # return statuses so certain stats can be used elsewhere
+    return statuses

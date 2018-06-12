@@ -133,7 +133,8 @@ def main():
         else:
             gmres = assess_gm(uMap, mapDat)
             reporting.output_gm(args.prefix, gmres)
-            reporting.report_gm(uMap, gmres, args.prefix)
+            gm_cdna_stat = reporting.report_gm_cDNA(gmres, cDNA_res, args.prefix) # per cDNA
+            reporting.report_gm(uMap, gmres, gm_cdna_stat, args.prefix) # per scaffold
     # if no genetic map data, write out the cDNA results
     else:
         # belatedly output the cDNA results without GM info
