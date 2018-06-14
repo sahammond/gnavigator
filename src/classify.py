@@ -26,14 +26,14 @@ def check_aln(aln, mode, ident_thold, cov_thold):
     
     if mode == 'assess':
         if pid >= ident_thold and pcov >= cov_thold:
-            return (cDNA, scaf, 'Complete')
+            return (cDNA, scaf, 'Complete', pid, pcov)
         elif pid >= ident_thold and pcov < cov_thold:
             if pcov >= 0.5:
-                return (cDNA, scaf, 'Partial')
+                return (cDNA, scaf, 'Partial', pid, pcov)
             else:
-                return (cDNA, scaf, 'Poorly mapped')
+                return (cDNA, scaf, 'Poorly mapped', pid, pcov)
         else:
-            return (cDNA, scaf, 'Poorly mapped')
+            return (cDNA, scaf, 'Poorly mapped', pid, pcov)
     
     elif mode == 'report':
         goodb = matches
@@ -54,19 +54,18 @@ def check_frag(alns, ident_thold, cov_thold):
     seg = 0
     qsize = 0
     cDNA = ''
-    scaf = []
+    scafL = []
         
     for aln in alns:
+        # check if it might qualify as complete
+        cDNA, scaf, status, pid, pcov = check_aln(aln, 'assess', ident_thold, cov_thold)
+        if status == 'Complete':
+            return (cDNA, scaf, 'Complete', pid, pcov)
         this_aln = check_aln(aln, 'report', ident_thold, cov_thold)
-        # check if if might qualify as complete
-        check_comp = check_aln(aln, 'assess', ident_thold, cov_thold)
-        if check_comp == 'Complete':
-            scaf = this_aln[5]
-            return (cDNA, scaf, 'Complete')
         goodb += this_aln[0]
         covb += this_aln[1]
         seg += this_aln[2]
-        scaf.append(this_aln[5])
+        scafL.append(this_aln[5])
     else:
         qsize = this_aln[3]
         cDNA = this_aln[4]
@@ -74,16 +73,16 @@ def check_frag(alns, ident_thold, cov_thold):
     pid = goodb / seg
     pcov = covb / qsize
     
-    scaf_rep = ";".join(scaf)
+    scaf_rep = ";".join(scafL)
     if pid >= ident_thold and pcov >= cov_thold:
-        return (cDNA, scaf_rep, 'Fragmented')
+        return (cDNA, scaf_rep, 'Fragmented', pid, pcov)
     elif pid >= ident_thold and pcov < cov_thold:
         if pcov > 0.5:
-            return (cDNA, scaf_rep, 'Partial')
+            return (cDNA, scaf_rep, 'Partial', pid, pcov)
         else:
-            return (cDNA, scaf_rep, 'Poorly mapped')
+            return (cDNA, scaf_rep, 'Poorly mapped', pid, pcov)
     else:
-        return (cDNA, scaf_rep, 'Poorly mapped')
+        return (cDNA, scaf_rep, 'Poorly mapped', pid, pcov)
 
 
 def check_dupl(alns, ident_thold, cov_thold):
@@ -91,25 +90,25 @@ def check_dupl(alns, ident_thold, cov_thold):
     # >1 alignment must be complete in order to be duplicated
     # one or more partial, fragmented, poorly mapped will not count
     cDNA = ''
-    scaf = []
+    scafL = []
     results = {'Complete':[], 'Partial':[], 'Duplicated':[],
                'Poorly mapped':[]}
     for aln in alns:
         this_aln = check_aln(aln, 'assess', ident_thold, cov_thold)
-        res = this_aln[-1]
-        results[res].append(this_aln)
-        scaf.append(this_aln[1])
-    else:
-        cDNA = this_aln[0]
+        cDNA, scaf, status, pid, pcov = this_aln
+        results[status].append(this_aln)
+        scafL.append(scaf)
+#    else:
+#        cDNA = this_aln[0]
     scaf_rep = ";".join(scaf)
     num_complete = len(results['Complete'])
     if num_complete == 1:
-        best_scaf = scaf[0]
-        return (cDNA, best_scaf, 'Complete')
+        best_scaf = scafL[0]
+        return (cDNA, best_scaf, 'Complete', pid, pcov)
     elif num_complete > 1:
-        return (cDNA, scaf_rep, 'Duplicated')
+        return (cDNA, scaf_rep, 'Duplicated', pid, pcov)
     else:
         if len(results['Partial']) >= 1:
-            return (cDNA, scaf_rep, 'Partial')
+            return (cDNA, scaf_rep, 'Partial', pid, pcov)
         else:
-            return (cDNA, scaf_rep, 'Poorly mapped')
+            return (cDNA, scaf_rep, 'Poorly mapped', pid, pcov)

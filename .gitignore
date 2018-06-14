@@ -2,3 +2,5 @@
 *.bk
 src/*.pyc
 gmap_config.txt
+src/*.swp
+*.swp
