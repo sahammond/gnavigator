@@ -18,7 +18,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(
 import utilities as util
 
 def run_gmap(prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA, genome, trans_mode):
-    gnavigator_path = re.sub('src/alignment.py', '', os.path.realpath(__file__))
+    gnavigator_path = re.sub('src/alignment.pyc', '', os.path.realpath(__file__))
+    gnavigator_path = re.sub('src/alignment.py', '', gnavigator_path)
     # detect pre-existing index, use this check later
     # n.b. ref153positions is final index file created
     checkI = os.path.isfile(''.join([os.getcwd(), '/', prefix, '-gmap-index-dir/',
