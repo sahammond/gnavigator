@@ -30,7 +30,7 @@ def find_missing(fasta, res_dict):
         resID = set([x[0] for x in value])
         detected = detected.union(resID)
     missing = cDNA_set.difference(detected)
-    missingL = [(x, 'NA', 'Missing') for x in missing]
+    missingL = [(x, 'NA', 'Missing', 'NA', 'NA') for x in missing]
     
     return (missingL, tot_cDNA)
 
@@ -206,6 +206,73 @@ def report_gm(uMap, gm_results, gm_cdna_statuses, prefix):
     print ' '.join(['%s (%s%%) were from the same linkage group but their order',
                     'could not be determined.']) % (num_undet, pct_undet)
     print util.report_time()
+
+
+def measure_scaf(fasta):
+    """Create dict of scaffold ID and size"""
+    assembly = {}
+    with open(fasta, 'r') as infile:
+        for rec in fasta_iter(infile):
+            seqid, sqn = rec
+            seqid_only = seqid.split(" ")[0]
+            slen = len(sqn)
+            assembly[seqid_only] = slen
+
+    return assembly
+    
+
+def best_hit(cDNA_results, assembly):
+    """Choose best hit by %ident and %cov per GM cDNA"""
+    # if cDNA is complete, then that is the best hit
+    # otherwise, rank by pcov, pid, scaf size in that order
+    best = {}
+    for status, alns in cDNA_results.items():
+        if status == 'Complete':
+            for result in alns:
+                cdna, scaf, stat, pid, pcov = result
+                this_aln = result
+                scaf_sz = assembly[scaf]
+                this_aln += (scaf_sz,)
+                best[cdna] = this_aln
+        elif status != 'Missing':
+            for result in alns:
+                cdna, scaf, stat, pid, pcov = result
+                this_aln = result
+
+                if ';' in scaf:
+                # i.e. if there are multiple scaffold IDs
+                    best_scaf = scaf.split(';')[0]
+                    scaf_sz = assembly[best_scaf]
+                else:
+                    best_scaf = scaf
+                    scaf_sz = assembly[best_scaf]
+
+                aln_rec = (cdna, best_scaf, stat, pid, pcov, scaf_sz)
+
+                if cdna not in best:
+                    best[cdna] = aln_rec
+                else:
+                    b_cdna, b_scaf, b_stat, b_pid, b_pcov, b_scaf_sz = best[cdna]
+                    if pcov > b_pcov or pcov == b_pcov and pid > b_pid \
+                        or pcov == b_pcov and pid == b_pid and scaf_sz > b_scaf_sz:
+                        best[cdna] = aln_rec
+
+        elif status == 'Missing':
+            for result in alns:
+                cdna, scaf, stat, pid, pcov = result
+                miss_stat = (cdna, scaf, stat, pid, pcov, 'NA')
+                best[cdna] = miss_stat
+
+    return best
+
+
+def output_expanded_gm(gmfile, best, prefix):
+    """Write a file of best result per GM cDNA"""
+    outname = '-'.join([prefix, 'expanded-genetic-map.tsv'])
+    with open(outname, 'w') as outfile:
+        for cdna, aln in best.items():
+            res = util.expanded_GM_formatter(aln, gmfile)
+            print >> outfile, res
 
 
 def report_gm_cDNA(gm_results, cDNA_results, prefix):

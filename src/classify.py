@@ -91,8 +91,7 @@ def check_dupl(alns, ident_thold, cov_thold):
     # one or more partial, fragmented, poorly mapped will not count
     cDNA = ''
     scafL = []
-    results = {'Complete':[], 'Partial':[], 'Duplicated':[],
-               'Poorly mapped':[]}
+    results = {'Complete':[], 'Partial':[], 'Poorly mapped':[]}
     for aln in alns:
         this_aln = check_aln(aln, 'assess', ident_thold, cov_thold)
         cDNA, scaf, status, pid, pcov = this_aln
@@ -100,15 +99,21 @@ def check_dupl(alns, ident_thold, cov_thold):
         scafL.append(scaf)
 #    else:
 #        cDNA = this_aln[0]
-    scaf_rep = ";".join(scaf)
+    scaf_rep = ";".join(scafL)
     num_complete = len(results['Complete'])
     if num_complete == 1:
-        best_scaf = scafL[0]
+        best_scaf = scafL[0] # best alignment appears first
         return (cDNA, best_scaf, 'Complete', pid, pcov)
     elif num_complete > 1:
+        # get the best (first) one
+        cdna, scaf, stat, pid, pcov = results['Complete'][0]
         return (cDNA, scaf_rep, 'Duplicated', pid, pcov)
     else:
         if len(results['Partial']) >= 1:
+            # get the best (first) one
+            cdna, scaf, stat, pid, pcov = results['Partial'][0]
             return (cDNA, scaf_rep, 'Partial', pid, pcov)
         else:
+            # get the best (first) one
+            cdna, scaf, stat, pid, pcov = results['Poorly mapped'][0]
             return (cDNA, scaf_rep, 'Poorly mapped', pid, pcov)

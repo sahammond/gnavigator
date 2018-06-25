@@ -112,6 +112,9 @@ def main():
     TOT = check_missing[1]
     cDNA_res['Missing'] = check_missing[0]
 
+    # get scaffold sizes
+    assembly = reporting.measure_scaf(args.genome)
+
     # load genetic map data
     if check_gm:
         if not checkU:
@@ -124,6 +127,7 @@ def main():
             # belatedly output the cDNA results with GM info
             reporting.output_cDNA(args.prefix, cDNA_res, mapDat)
             reporting.report_cDNA(args.prefix, cDNA_res, TOT)
+            best_hits = reporting.best_hit(cDNA_res, assembly)
         # check if there's anything to work with
         if len(uniqDatMap) == 0:
             print 'ERROR: There are no cDNAs from the genetic map to evaluate.'
@@ -135,6 +139,8 @@ def main():
             reporting.output_gm(args.prefix, gmres)
             gm_cdna_stat = reporting.report_gm_cDNA(gmres, cDNA_res, args.prefix) # per cDNA
             reporting.report_gm(uMap, gmres, gm_cdna_stat, args.prefix) # per scaffold
+            # report best hit for each cDNA in GM
+            reporting.output_expanded_gm(mapDat, best_hits, args.prefix)
     # if no genetic map data, write out the cDNA results
     else:
         # belatedly output the cDNA results without GM info
