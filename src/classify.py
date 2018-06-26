@@ -100,7 +100,7 @@ def check_dupl(alns, ident_thold, cov_thold):
         scafL.append(scaf)
 #    else:
 #        cDNA = this_aln[0]
-    scaf_rep = ";".join(scaf)
+    scaf_rep = ";".join(scafL)
     num_complete = len(results['Complete'])
     if num_complete == 1:
         best_scaf = scafL[0]
