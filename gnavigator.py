@@ -25,6 +25,7 @@ import reporting
 import utilities as util
 import config
 import alignment
+import parseGmap
 
 try:
     import pandas as pd
@@ -112,9 +113,6 @@ def main():
     TOT = check_missing[1]
     cDNA_res['Missing'] = check_missing[0]
 
-    # get scaffold sizes
-    assembly = reporting.measure_scaf(args.genome)
-
     # load genetic map data
     if check_gm:
         if not checkU:
@@ -139,9 +137,15 @@ def main():
             reporting.output_gm(args.prefix, gmres)
             gm_cdna_stat = reporting.report_gm_cDNA(gmres, cDNA_res, args.prefix) # per cDNA
             reporting.report_gm(uMap, gmres, gm_cdna_stat, args.prefix) # per scaffold
-            # report best hit for each cDNA in GM
-            reporting.output_expanded_gm(mapDat, best_hits, args.prefix)
-    # if no genetic map data, write out the cDNA results
+
+            # output updated genetic map
+            gnavOut = '-'.join([args.prefix, 'full-cDNA-results-table.tsv'])
+            uniqF = '.'.join([args.prefix, 'uniq'])
+            duplF = '.'.join([args.prefix, 'mult'])
+            tlocF = '.'.join([args.prefix, 'transloc'])
+            parseGmap.wrapper(gnavOut, uniqF, duplF, tlocF, gmfile, args.prefix)
+
+# if no genetic map data, write out the cDNA results
     else:
         # belatedly output the cDNA results without GM info
         reporting.output_cDNA(args.prefix, cDNA_res)

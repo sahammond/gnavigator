@@ -21,7 +21,7 @@ if [ -z "${splice}" ]; then
         -x 20 \
         -O \
         --split-output=$prefix \
-        -n 10 \
+        -n 10000 \
         $infile > $logfile 2>&1
 else
     gmapl -D $db -d $dbname \
@@ -34,7 +34,7 @@ else
         -x 20 \
         -O \
         --split-output=$prefix \
-        -n 10 \
+        -n 10000 \
         $infile > $logfile 2>&1
 fi
 
