@@ -221,60 +221,6 @@ def measure_scaf(fasta):
     return assembly
     
 
-def best_hit(cDNA_results, assembly):
-    """Choose best hit by %ident and %cov per GM cDNA"""
-    # if cDNA is complete, then that is the best hit
-    # otherwise, rank by pcov, pid, scaf size in that order
-    best = {}
-    for status, alns in cDNA_results.items():
-        if status == 'Complete':
-            for result in alns:
-                cdna, scaf, stat, pid, pcov = result
-                this_aln = result
-                scaf_sz = assembly[scaf]
-                this_aln += (scaf_sz,)
-                best[cdna] = this_aln
-        elif status != 'Missing':
-            for result in alns:
-                cdna, scaf, stat, pid, pcov = result
-                this_aln = result
-
-                if ';' in scaf:
-                # i.e. if there are multiple scaffold IDs
-                    best_scaf = scaf.split(';')[0]
-                    scaf_sz = assembly[best_scaf]
-                else:
-                    best_scaf = scaf
-                    scaf_sz = assembly[best_scaf]
-
-                aln_rec = (cdna, best_scaf, stat, pid, pcov, scaf_sz)
-
-                if cdna not in best:
-                    best[cdna] = aln_rec
-                else:
-                    b_cdna, b_scaf, b_stat, b_pid, b_pcov, b_scaf_sz = best[cdna]
-                    if pcov > b_pcov or pcov == b_pcov and pid > b_pid \
-                        or pcov == b_pcov and pid == b_pid and scaf_sz > b_scaf_sz:
-                        best[cdna] = aln_rec
-
-        elif status == 'Missing':
-            for result in alns:
-                cdna, scaf, stat, pid, pcov = result
-                miss_stat = (cdna, scaf, stat, pid, pcov, 'NA')
-                best[cdna] = miss_stat
-
-    return best
-
-
-def output_expanded_gm(gmfile, best, prefix):
-    """Write a file of best result per GM cDNA"""
-    outname = '-'.join([prefix, 'expanded-genetic-map.tsv'])
-    with open(outname, 'w') as outfile:
-        for cdna, aln in best.items():
-            res = util.expanded_GM_formatter(aln, gmfile)
-            print >> outfile, res
-
-
 def report_gm_cDNA(gm_results, cDNA_results, prefix):
     """Report genetic map results as a proportion of eligible cDNAs"""
 

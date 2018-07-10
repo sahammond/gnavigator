@@ -125,7 +125,6 @@ def main():
             # belatedly output the cDNA results with GM info
             reporting.output_cDNA(args.prefix, cDNA_res, mapDat)
             reporting.report_cDNA(args.prefix, cDNA_res, TOT)
-            best_hits = reporting.best_hit(cDNA_res, assembly)
         # check if there's anything to work with
         if len(uniqDatMap) == 0:
             print 'ERROR: There are no cDNAs from the genetic map to evaluate.'

@@ -61,22 +61,6 @@ def LG_table_formatter(results_tuple):
     yield outbuff
 
 
-def expanded_GM_formatter(results_tuple, genetic_map):
-    """format "best_hits" results"""
-    cdna, scaf, stat, pid, pcov, sz = results_tuple
-    if cdna in set(genetic_map.cDNA.tolist()):
-        _cdna = genetic_map[genetic_map.cDNA.isin([cdna])]
-        lg = str(_cdna.LG.iloc[0])
-        cm = str(_cdna.cM.iloc[0])
-        strand = 'unknownStrand' # TODO track strand info
-    else:
-        lg = 'unknownLG'
-        cm = 'unknown_cM'
-        strand = 'unknownStrand' # TODO track strand info
-    outbuff = '\t'.join([lg, cm, cdna, scaf + strand + str(sz)])
-
-    return outbuff
-
 def report_time():
     rep = ' '.join(["Current time:",
                     strftime("%Y-%m-%d %H:%M:%S", localtime())])
