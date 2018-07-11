@@ -7,6 +7,7 @@ Helper and formatting functions.
 """
 
 from time import localtime, strftime
+from sys import argv
 
 
 def jira_formatter(num_pct_tuple):
@@ -64,4 +65,9 @@ def LG_table_formatter(results_tuple):
 def report_time():
     rep = ' '.join(["Current time:",
                     strftime("%Y-%m-%d %H:%M:%S", localtime())])
+    return rep
+
+
+def report_cmd():
+    rep = '## Gnavigator command was: ' + ' '.join(argv)
     return rep

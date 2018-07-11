@@ -77,6 +77,7 @@ def report_cDNA(prefix, cDNA_results, TOT):
         pcts = '\t'.join([str(x) for x in ['Percent', pct_sum_complete, pct_complete,
                                            pct_duplicated, pct_fragmented, pct_partial, pct_poor,
                                            pct_missing, pct_counted]])
+        print >> outfile, util.report_cmd()
         print >> outfile, header
         print >> outfile, nums
         print >> outfile, pcts
@@ -90,6 +91,7 @@ def report_cDNA(prefix, cDNA_results, TOT):
                 pct_poor, pct_missing, pct_counted]
         res = '|' + '|'.join([util.jira_formatter(x) for x in zip(nums, pcts)]) + '|'
         
+        print >> outfile, util.report_cmd()
         print >> outfile, header
         print >> outfile, res
 
@@ -113,6 +115,7 @@ def output_cDNA(prefix, cDNA_results, gm=''):
         if len(gm) > 0:
             header = '\t'.join(['# cDNA ID', 'Status', 'Scaffold',
                                 'Linkage group'])
+            print >> outfile, util.report_cmd()
             print >> outfile, header
             for status, result in cDNA_results.items():
                 for res in result:
@@ -120,6 +123,7 @@ def output_cDNA(prefix, cDNA_results, gm=''):
                         print >> outfile, t
         else:
             header = '\t'.join(['# cDNA ID', 'Status', 'Scaffold'])
+            print >> outfile, util.report_cmd()
             print >> outfile, header
             for status, result in cDNA_results.items():
                 for res in result:
@@ -132,6 +136,7 @@ def output_gm(prefix, gm_res):
     header = '\t'.join(['# Scaffold', 'cDNA IDs', 'Status', 'Linkage group(s)'])
     full_out = '-'.join([prefix, 'full-genetic-map-results-table.tsv'])
     with open(full_out, 'w') as outfile:
+        print >> outfile, util.report_cmd()
         print >> outfile, header
         for status, result in gm_res.items():
             for res in result:
@@ -179,6 +184,7 @@ def report_gm(uMap, gm_results, gm_cdna_statuses, prefix):
                                            num_WO_LG, num_diffLG, num_undet]])
         pcts = '\t'.join([str(x) for x in ['Percent', pct_solo, pct_LGscaff, pct_goodLG,
                                            pct_WO_LG, pct_diffLG, pct_undet]])
+        print >> outfile, util.report_cmd()
         print >> outfile, header
         print >> outfile, nums
         print >> outfile, pcts
@@ -189,6 +195,7 @@ def report_gm(uMap, gm_results, gm_cdna_statuses, prefix):
         nums = [num_solo, num_scaff_toCheck, num_goodLG, num_WO_LG, num_diffLG, num_undet]
         pcts = [pct_solo, pct_LGscaff, pct_goodLG, pct_WO_LG, pct_diffLG, pct_undet]
         res = '|' + '|'.join([util.jira_formatter(x) for x in zip(nums, pcts)]) + '|'
+        print >> outfile, util.report_cmd()
         print >> outfile, header
         print >> outfile, res
 
@@ -278,6 +285,7 @@ def report_gm_cDNA(gm_results, cDNA_results, prefix):
                                            num_undet]])
         pcts = '\t'.join([str(x) for x in ['Percent', pct_solo, pct_good, pct_wo, pct_diff,
                                            pct_undet]])
+        print >> outfile, util.report_cmd()
         print >> outfile, header
         print >> outfile, nums
         print >> outfile, pcts
@@ -288,6 +296,7 @@ def report_gm_cDNA(gm_results, cDNA_results, prefix):
         nums = [num_solo, num_good, num_wo, num_diff, num_undet]
         pcts = [pct_solo, pct_good, pct_wo, pct_diff, pct_undet]
         res = '|' + '|'.join([util.jira_formatter(x) for x in zip(nums, pcts)]) + '|'
+        print >> outfile, util.report_cmd()
         print >> outfile, header
         print >> outfile, res
 
