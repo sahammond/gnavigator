@@ -149,13 +149,14 @@ def report_gm(uniqDatMap_select, gm_results, gm_cdna_statuses, prefix):
     num_scaff_toCheck = len(uniqDatMap_select.tname.unique())
     num_solo = gm_cdna_statuses['Solo']
     #tot = num_scaff_toCheck + gm_cdna_statuses['Solo']
-    tot = num_scaff_toCheck # for legacy reasons
     num_goodLG = len(gm_results['goodLG'])
     num_WO_LG = len(gm_results['WO_LG'])
     num_diffLG = len(gm_results['diffLG'])
     num_undet = len(gm_results['undet'])
     num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG + num_undet + num_solo
     num_2plus_scaff = num_goodLG + num_WO_LG + num_diffLG + num_undet
+
+    tot = num_scaff_checked # for legacy reasons
     if num_scaff_toCheck == num_scaff_checked:
         rate_solo = float(num_solo) / float(tot)
         rate_LGscaff = float(num_2plus_scaff) / float(tot)
@@ -206,13 +207,13 @@ def report_gm(uniqDatMap_select, gm_results, gm_cdna_statuses, prefix):
     print ' '.join(['%s (%s%%) had exactly 1 complete cDNA from the genetic map',
                     'aligned to them.']) % (num_solo, pct_solo)
     print ' '.join(['%s (%s%%) had 2+ complete cDNAs from the genetic map',
-                    'aligned to them.']) % (num_scaff_checked, pct_LGscaff)
-    print ' '.join(['%s (%s%%) were from the same linkage group and in the',
+                    'aligned to them.']) % (num_2plus_scaff, pct_LGscaff)
+    print ' '.join(['  %s (%s%%) were from the same linkage group and in the',
                     'expected order.']) % (num_goodLG, pct_goodLG)
-    print ' '.join(['%s (%s%%) were from the same linkage group, but NOT in',
+    print ' '.join(['  %s (%s%%) were from the same linkage group, but NOT in',
                     'the expected order.']) % (num_WO_LG, pct_WO_LG)
-    print '%s (%s%%) were from different linkage groups.' % (num_diffLG, pct_diffLG)
-    print ' '.join(['%s (%s%%) were from the same linkage group but their order',
+    print '  %s (%s%%) were from different linkage groups.' % (num_diffLG, pct_diffLG)
+    print ' '.join(['  %s (%s%%) were from the same linkage group but their order',
                     'could not be determined.']) % (num_undet, pct_undet)
     print util.report_time()
 
