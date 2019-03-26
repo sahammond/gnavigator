@@ -138,25 +138,27 @@ def output_gm(prefix, gm_res):
     with open(full_out, 'w') as outfile:
         print >> outfile, util.report_cmd()
         print >> outfile, header
-        for status, result in gm_res.items():
+        for status, result in gm_res.items(): ### what do I do with status here? Or is it just discarded because there should only be complete, single cDNAs in gm_res
             for res in result:
                 for t in util.LG_table_formatter(res):
                     print >> outfile, t
 
 
-def report_gm(uMap, gm_results, gm_cdna_statuses, prefix):
+def report_gm(uniqDatMap_select, gm_results, gm_cdna_statuses, prefix):
     """report summary of genetic map results"""
-    num_scaff_toCheck = len(uMap.tname.unique())
+    num_scaff_toCheck = len(uniqDatMap_select.tname.unique())
     num_solo = gm_cdna_statuses['Solo']
-    tot = num_scaff_toCheck + gm_cdna_statuses['Solo']
+    #tot = num_scaff_toCheck + gm_cdna_statuses['Solo']
+    tot = num_scaff_toCheck # for legacy reasons
     num_goodLG = len(gm_results['goodLG'])
     num_WO_LG = len(gm_results['WO_LG'])
     num_diffLG = len(gm_results['diffLG'])
     num_undet = len(gm_results['undet'])
-    num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG + num_undet
+    num_scaff_checked = num_goodLG + num_WO_LG + num_diffLG + num_undet + num_solo
+    num_2plus_scaff = num_goodLG + num_WO_LG + num_diffLG + num_undet
     if num_scaff_toCheck == num_scaff_checked:
         rate_solo = float(num_solo) / float(tot)
-        rate_LGscaff = float(num_scaff_checked) / float(tot)
+        rate_LGscaff = float(num_2plus_scaff) / float(tot)
         rate_goodLG = float(num_goodLG) / float(tot)
         rate_WO_LG = float(num_WO_LG) / float(tot)
         rate_diffLG = float(num_diffLG) / float(tot)
@@ -180,7 +182,7 @@ def report_gm(uMap, gm_results, gm_cdna_statuses, prefix):
         header_txt = ['', '1 complete cDNA', '2+ complete cDNAs', 'Same LG, expected order',
                       'Same LG, unexpected order','Different LG', 'Same LG, undetermined order']
         header = '\t'.join(header_txt)
-        nums = '\t'.join([str(x) for x in ['Number', num_solo, num_scaff_toCheck, num_goodLG,
+        nums = '\t'.join([str(x) for x in ['Number', num_solo, num_2plus_scaff, num_goodLG,
                                            num_WO_LG, num_diffLG, num_undet]])
         pcts = '\t'.join([str(x) for x in ['Percent', pct_solo, pct_LGscaff, pct_goodLG,
                                            pct_WO_LG, pct_diffLG, pct_undet]])
@@ -228,7 +230,7 @@ def measure_scaf(fasta):
     return assembly
     
 
-def report_gm_cDNA(gm_results, cDNA_results, prefix):
+def report_gm_cDNA(gm_results, uniqMapDat_select, prefix):
     """Report genetic map results as a proportion of eligible cDNAs"""
 
     # input cDNA_results is dict with keys == cDNA status
@@ -248,9 +250,9 @@ def report_gm_cDNA(gm_results, cDNA_results, prefix):
                 tot += 1
 
     miss = 'Solo'
-    for rec in cDNA_results['Complete']:
-        cdna = rec[0]
-        scaf = rec[1]
+    for rec in uniqMapDat_select.iterrows():
+        cdna = rec[1][9]
+        scaf = rec[1][13]
 
         if cdna not in gm_cdna_res:
             gm_cdna_res[cdna] = [scaf, miss]

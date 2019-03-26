@@ -121,12 +121,12 @@ def main():
                           ' not be performed'])
             sys.exit(2)
         else:
-            mapDat, uMap, uniqDatMap = load_gm(gmfile, uniqDat)
+            mapDat, uMap, uniqDatMap_select = load_gm(gmfile, uniqDat, cDNA_res)
             # belatedly output the cDNA results with GM info
             reporting.output_cDNA(args.prefix, cDNA_res, mapDat)
             reporting.report_cDNA(args.prefix, cDNA_res, TOT)
         # check if there's anything to work with
-        if len(uniqDatMap) == 0:
+        if len(uniqDatMap_select) == 0:
             print 'ERROR: There are no cDNAs from the genetic map to evaluate.'
             print ''.join(['This can happen if the cDNA sequence IDs do not match those',
                   ' in the genetic map.'])
@@ -134,8 +134,8 @@ def main():
         else:
             gmres = assess_gm(uMap, mapDat)
             reporting.output_gm(args.prefix, gmres)
-            gm_cdna_stat = reporting.report_gm_cDNA(gmres, cDNA_res, args.prefix) # per cDNA
-            reporting.report_gm(uMap, gmres, gm_cdna_stat, args.prefix) # per scaffold
+            gm_cdna_stat = reporting.report_gm_cDNA(gmres, uniqDatMap_select, args.prefix) # per cDNA
+            reporting.report_gm(uniqDatMap_select, gmres, gm_cdna_stat, args.prefix) # per scaffold
 
             # output updated genetic map
             gnavOut = '-'.join([args.prefix, 'full-cDNA-results-table.tsv'])
@@ -256,7 +256,17 @@ def assess(checkU, checkD, checkM, uniqDat, tlocDat, duplDat, cDNA_results,
     return cDNA_results
 
 
-def load_gm(gmfile, uniqDat):
+def selex(cDNA_results):
+    # lazy function to select cDNAs that are complete
+    out = set()
+    for res in cDNA_results['Complete']:
+        this_cDNA = res[0]
+        out.add(this_cDNA)
+
+    return out
+
+
+def load_gm(gmfile, uniqDat, compl):
     """Read in genetic map. Expect format LG\tcM\tcDNA"""
     mapDat = pd.read_csv(gmfile, sep='\t', comment='#', low_memory=False,
                          header=None, names=['LG', 'cM', 'cDNA'])
@@ -264,13 +274,17 @@ def load_gm(gmfile, uniqDat):
     # limit genetic map analysis to complete (i.e. single) cDNAs
     map_cDNA = set(mapDat.cDNA.tolist())
     uniqDatMap = uniqDat[uniqDat.qname.isin(map_cDNA)]
-    uMap = uniqDatMap[uniqDatMap.tname.duplicated(keep=False)]
 
-    return (mapDat, uMap, uniqDatMap)
+    compl_set = selex(compl) # apply selex function to get complete cDNAs only
+    uniqDatMap_select = uniqDatMap[uniqDatMap.qname.isin(compl_set)]
+
+    uMap = uniqDatMap_select[uniqDatMap_select.duplicated('tname',keep=False)]
+
+    return (mapDat, uMap, uniqDatMap_select)
 
 
 def assess_gm(uMap, mapDat):
-    """apply check_LG to whole uniq set"""
+    """apply check_LG to whole complete set"""
     gm_res = {'goodLG':[], 'WO_LG':[], 'diffLG':[], 'undet':[]}
     for rec in uMap.tname.unique():
         thisScaf = uMap[uMap.tname.isin([rec])]
