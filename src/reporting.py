@@ -195,7 +195,7 @@ def report_gm(uniqDatMap_select, gm_results, gm_cdna_statuses, prefix):
     with open(jiraout, 'w') as outfile:
         header_txt.extend(['']) # add final empty string for jira table separator
         header = '||'.join(header_txt)
-        nums = [num_solo, num_scaff_toCheck, num_goodLG, num_WO_LG, num_diffLG, num_undet]
+        nums = [num_solo, num_2plus_scaff, num_goodLG, num_WO_LG, num_diffLG, num_undet]
         pcts = [pct_solo, pct_LGscaff, pct_goodLG, pct_WO_LG, pct_diffLG, pct_undet]
         res = '|' + '|'.join([util.jira_formatter(x) for x in zip(nums, pcts)]) + '|'
         print >> outfile, util.report_cmd()
