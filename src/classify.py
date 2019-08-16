@@ -117,3 +117,44 @@ def check_dupl(alns, ident_thold, cov_thold):
             # get the best (first) one
             cdna, scaf, stat, pid, pcov = results['Poorly mapped'][0]
             return (cDNA, scaf_rep, 'Poorly mapped', pid, pcov)
+
+
+def assess(checkU, checkD, checkM, uniqDat, tlocDat, duplDat, cDNA_results,
+           ident_thold, cov_thold):
+    # apply check_complete to whole set
+    if checkU:
+        for rec in uniqDat.itertuples():
+            res = check_aln(rec, 'assess', ident_thold, cov_thold)
+            cDNA_results[res[2]].append(res) # append results tuple
+
+    # apply check_frag to whole set
+    if checkD:
+        for qry in tlocDat.qname.unique():
+            this_qry = tlocDat[tlocDat.qname == qry]
+            frags = []
+            for rec in this_qry.itertuples():
+                frags.append(rec)
+            res = check_frag(frags, ident_thold, cov_thold)
+            cDNA_results[res[2]].append(res)
+
+    # apply check_dupl to whole set
+    if checkM:
+        for qry in duplDat.qname.unique():
+            this_qry = duplDat[duplDat.qname == qry]
+            frags = []
+            for rec in this_qry.itertuples():
+                frags.append(rec)
+            res = check_dupl(frags, ident_thold, cov_thold)
+            cDNA_results[res[2]].append(res)
+
+    return cDNA_results
+
+
+def selex(cDNA_results):
+    # lazy function to select cDNAs that are complete
+    out = set()
+    for res in cDNA_results['Complete']:
+        this_cDNA = res[0]
+        out.add(this_cDNA)
+
+    return out
