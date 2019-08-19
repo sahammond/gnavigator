@@ -30,34 +30,34 @@ def run_gmap(prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA, genome, tra
     alignlog = '-'.join([prefix, 'gmap', 'alignment.log'])
     # check if user supplied an index
     if dbDflag and dbNflag:
-        print '\n=== Skipping GMAP index construction ==='
-        print 'Gnavigator will use the user-specified index:'
-        print dbDir
-        print util.report_time()
+        print('\n=== Skipping GMAP index construction ===')
+        print('Gnavigator will use the user-specified index:')
+        print(dbDir)
+        print(util.report_time())
     # if not, check if index made already
     elif checkI:
-        print '\n=== Skipping GMAP index construction ==='
-        print 'Gnavigator found a pre-existing GMAP index:'
-        print ''.join([os.getcwd(), '/', prefix, '-gmap-index-dir'])
-        print util.report_time()      
+        print('\n=== Skipping GMAP index construction ===')
+        print('Gnavigator found a pre-existing GMAP index:')
+        print(''.join([os.getcwd(), '/', prefix, '-gmap-index-dir']))
+        print(util.report_time())
     # otherwise, make gmap index
     else:
-        print '\n=== Building GMAP database ==='
-        print util.report_time()
+        print('\n=== Building GMAP database ===')
+        print(util.report_time())
         try:
             index_cmd = [gnavigator_path + 'bin/build-index.sh', dbDir,
                          dbName, genome, indexlog]
             subprocess.check_call(index_cmd)
         except subprocess.CalledProcessError:
-            print '\nERROR: Failed to build GMAP index.'
-            print 'Make sure that the genome file exists.'
+            print('\nERROR: Failed to build GMAP index.')
+            print('Make sure that the genome file exists.')
             sys.exit(1)
-        print 'Done!'
+        print('Done!')
     # run gmap alignment
-    print '\n=== Performing GMAP alignments ==='
-    print util.report_time()
+    print('\n=== Performing GMAP alignments ===')
+    print(util.report_time())
     if trans_mode:    
-        print 'Running in transcriptome assessment mode. Will run GMAP without splicing.'
+        print('Running in transcriptome assessment mode. Will run GMAP without splicing.')
         try:
             # try running regular gmap first; will fail if genome too big
             gmap_cmd = [gnavigator_path + 'bin/run-gmap.sh', dbDir, dbName,
@@ -70,10 +70,10 @@ def run_gmap(prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA, genome, tra
                              threads, prefix, cDNA, alignlog, 'N']
                 subprocess.check_call(gmapl_cmd)
             except subprocess.CalledProcessError as e:
-                print '\nERROR: Failed to perform GMAP alignment.'
-                print 'Make sure that the cDNA file exists.'
-                print 'GMAP error text:'
-                print e.output
+                print('\nERROR: Failed to perform GMAP alignment.')
+                print('Make sure that the cDNA file exists.')
+                print('GMAP error text:')
+                print(e.output)
                 sys.exit(1)
     else:
         # not in transcriptome mode; run WITH splicing
@@ -89,9 +89,9 @@ def run_gmap(prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA, genome, tra
                              threads, prefix, cDNA, alignlog]
                 subprocess.check_call(gmapl_cmd)
             except subprocess.CalledProcessError as e:
-                print '\nERROR: Failed to perform GMAP alignment.'
-                print 'Make sure that the cDNA file exists.'
-                print 'GMAP error text:'
-                print e.output
+                print('\nERROR: Failed to perform GMAP alignment.')
+                print('Make sure that the cDNA file exists.')
+                print('GMAP error text:')
+                print(e.output)
                 sys.exit(1)
-    print 'Done!'
+    print('Done!')

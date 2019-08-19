@@ -1,5 +1,3 @@
-#!/usr/bin/env python2
-
 """
 Created on 23 May 2018
 
@@ -20,14 +18,14 @@ def check_config():
     conf_file = ''.join([gnavigator_path, 'gmap_config.txt'])
     if not os.path.isfile(conf_file):
         msg = ' '.join([conf_file, ' not detected. Auto-generating'])
-        print msg
+        print(msg)
         status = make_config()
         if status:
             msg = ' '.join(['Created', conf_file])
-            print msg
+            print(msg)
     else:
         msg = ' '.join(['Found', conf_file])
-        print msg
+        print(msg)
         status = True
 
     return status
@@ -51,7 +49,7 @@ def make_config():
         outname = gnavigator_path + 'gmap_config.txt'
         with open(outname, 'w') as outfile:
             path_str = ''.join(['export ', 'PATH=', gmap_dir, ':$PATH'])
-            print >> outfile, path_str
+            print(path_str, file=outfile)
 
     # check flag in main script and die if necessary
     return pass_flag

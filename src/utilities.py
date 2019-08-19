@@ -50,16 +50,16 @@ def preflight(prefix, stage='post'):
 
     if stage == 'pre':
         if checkU or checkM or checkD:
-            print '\n=== Skipping GMAP alignment stage ==='
-            print ''.join(['Gnavigator found pre-existing GMAP alignment results.',
-                           ' Will use the following files:'])
+            print('\n=== Skipping GMAP alignment stage ===')
+            print(''.join(['Gnavigator found pre-existing GMAP alignment results.',
+                           ' Will use the following files:']))
             if checkU:
-                print ''.join([os.getcwd(), '/', prefix, '.uniq'])
+                print(''.join([os.getcwd(), '/', prefix, '.uniq']))
             if checkM:
-                print ''.join([os.getcwd(), '/', prefix, '.mult'])
+                print(''.join([os.getcwd(), '/', prefix, '.mult']))
             if checkD:
-                print ''.join([os.getcwd(), '/', prefix, '.transloc'])
-            print util.report_time()
+                print(''.join([os.getcwd(), '/', prefix, '.transloc']))
+            print(util.report_time())
     elif stage == 'post':
         pass
 

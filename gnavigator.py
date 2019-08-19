@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 """
 Created on 23 May 2018
@@ -11,9 +11,6 @@ Use cDNA sequences +/- genetic map information to assess a genome
 
 import sys
 import os
-import subprocess
-import re
-import argparse
 
 # ensure gnavigator's src directory is in PYTHONPATH
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(
@@ -84,9 +81,9 @@ def main():
         if config.check_config():
             pass # found gmap, don't panic
         else:
-            print ''.join(['ERROR: Failed to locate gmap binaries. Please install',
+            print(''.join(['ERROR: Failed to locate gmap binaries. Please install',
                            ' or specify path in gmap_config.txt manually.\n',
-                            'e.g. export PATH=/home/myuser/gmap/bin:$PATH'])
+                            'e.g. export PATH=/home/myuser/gmap/bin:$PATH']))
             sys.exit(1)
         # run the alignments
         alignment.run_gmap(args.prefix, dbDir, dbDflag, dbName, dbNflag, threads, cDNA,
@@ -102,11 +99,11 @@ def main():
     uniqDat, duplDat, tlocDat = util.load_data(checkU, checkM, checkD, args.prefix)
 
     # run assessment
-    print '\n=== Evaluating alignments ==='
+    print('\n=== Evaluating alignments ===')
     cDNA_res = classify.assess(checkU, checkM, checkD, uniqDat, tlocDat, duplDat, cDNA_dict,
                       ident_thold, cov_thold)
-    print 'Done!'
-    print util.report_time()
+    print('Done!')
+    print(util.report_time())
 
     # count total number of query sequences
     check_missing = reporting.find_missing(cDNA, cDNA_res)
@@ -116,9 +113,9 @@ def main():
     # load genetic map data
     if check_gm:
         if not checkU:
-            print ''.join(['WARNING: There were no uniquely-aligned cDNAs',
+            print(''.join(['WARNING: There were no uniquely-aligned cDNAs',
                           ' detected, so the genetic map analysis will',
-                          ' not be performed'])
+                          ' not be performed']))
             sys.exit(2)
         else:
             mapDat, uMap, uniqDatMap_select = gm.load_gm(gmfile, uniqDat, cDNA_res)
@@ -127,9 +124,9 @@ def main():
             reporting.report_cDNA(args.prefix, cDNA_res, TOT)
         # check if there's anything to work with
         if len(uniqDatMap_select) == 0:
-            print 'ERROR: There are no cDNAs from the genetic map to evaluate.'
-            print ''.join(['This can happen if the cDNA sequence IDs do not match those',
-                  ' in the genetic map.'])
+            print('ERROR: There are no cDNAs from the genetic map to evaluate.')
+            print(''.join(['This can happen if the cDNA sequence IDs do not match those',
+                  ' in the genetic map.']))
             sys.exit(2)
         else:
             gmres = gm.assess_gm(uMap, mapDat)
@@ -138,10 +135,10 @@ def main():
             reporting.report_gm(uniqDatMap_select, gmres, gm_cdna_stat, args.prefix) # per scaffold
 
             # output updated genetic map
-            gnavOut = '-'.join([args.prefix, 'full-cDNA-results-table.tsv'])
-            uniqF = '.'.join([args.prefix, 'uniq'])
-            duplF = '.'.join([args.prefix, 'mult'])
-            tlocF = '.'.join([args.prefix, 'transloc'])
+            gnavOut = f'{args.prefix}-full-cDNA-results-table.tsv'
+            uniqF = f'{args.prefix}.uniq'
+            duplF = f'{args.prefix}.mult'
+            tlocF = f'{args.prefix}.transloc'
             parseGmap.wrapper(gnavOut, uniqF, duplF, tlocF, gmfile, args.prefix)
 
 # if no genetic map data, write out the cDNA results

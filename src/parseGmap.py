@@ -113,7 +113,7 @@ def wrapper(gnavOut, uniq, mult, tloc, GM, prefix):
     expanded_gm = '-'.join([prefix, 'expanded-genetic-map.tsv'])
     with open(expanded_gm, 'w') as outfile:
         for line in outputGM(cDNAs, GM):
-            print >> outfile, line
+            print(line, file=outfile)
 #outputGM(cDNAs, GM)
 
 
