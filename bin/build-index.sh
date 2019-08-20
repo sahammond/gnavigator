@@ -8,6 +8,10 @@ dbname=$1; shift
 infile=$1; shift
 logfile=$1
 
-gmap_build -D $db -d $dbname --sort=none $infile > $logfile 2>&1
+if [[ $infile =~ ".gz" ]]; then
+    gmap_build -D $db -d $dbname --sort=none -g $infile > $logfile 2>&1
+else
+    gmap_build -D $db -d $dbname --sort=none $infile > $logfile 2>&1
+fi
 
 ### EOF ###

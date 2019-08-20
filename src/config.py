@@ -39,7 +39,7 @@ def make_config():
 
     if not err:
         pass_flag = True
-        gmap_dir = re.sub('/gmap$', '', out).strip('\n')
+        gmap_dir = re.sub('/gmap$', '', str(out)).strip('\n')[2:-3] #
     else:    
         pass_flag = False
 
