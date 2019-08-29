@@ -7,6 +7,8 @@ These functions work with genetic map-type data.
 
 """
 
+import pandas as pd
+
 from itertools import permutations
 
 def load_gm(gmfile, uniqDat, compl):
@@ -121,3 +123,13 @@ def assess_gm(uMap, mapDat):
             gm_res['undet'].append(res)
 
     return gm_res
+
+
+def selex(cDNA_results):
+    # lazy function to select cDNAs that are complete
+    out = set()
+    for res in cDNA_results['Complete']:
+        this_cDNA = res[0]
+        out.add(this_cDNA)
+
+    return out

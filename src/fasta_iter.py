@@ -14,8 +14,7 @@ def fasta_iter(fasta_name):
               lambda line: line[0] == ">"))
     for header in faiter:
         # drop the ">"
-        header = header.next()[1:].strip()
+        header = next(header)[1:].strip()
         # join all sequence lines to one.
-        seq = "".join(s.strip() for s in faiter.next())
+        seq = "".join(s.strip() for s in next(faiter))
         yield header, seq
-

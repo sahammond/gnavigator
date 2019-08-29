@@ -148,13 +148,3 @@ def assess(checkU, checkD, checkM, uniqDat, tlocDat, duplDat, cDNA_results,
             cDNA_results[res[2]].append(res)
 
     return cDNA_results
-
-
-def selex(cDNA_results):
-    # lazy function to select cDNAs that are complete
-    out = set()
-    for res in cDNA_results['Complete']:
-        this_cDNA = res[0]
-        out.add(this_cDNA)
-
-    return out

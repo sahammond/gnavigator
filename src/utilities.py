@@ -10,6 +10,7 @@ import os
 import subprocess
 import re
 import argparse
+import pandas as pd
 
 from time import localtime, strftime
 from sys import argv
@@ -59,7 +60,7 @@ def preflight(prefix, stage='post'):
                 print(''.join([os.getcwd(), '/', prefix, '.mult']))
             if checkD:
                 print(''.join([os.getcwd(), '/', prefix, '.transloc']))
-            print(util.report_time())
+            print(report_time())
     elif stage == 'post':
         pass
 
